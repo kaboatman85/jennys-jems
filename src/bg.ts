@@ -6,16 +6,7 @@
 // cropped out) is drawn on top to restore them. Falls back to a plain
 // gradient (matching the mockup's own tones) until the image loads.
 
-import {
-  FLOWER_COLORS,
-  drawBranch,
-  drawCloud,
-  drawFlower,
-  drawLeaf,
-  drawPetal,
-  drawSparkle,
-  drawTasselKnot,
-} from './deco.ts';
+import { FLOWER_COLORS, drawBranch, drawCloud, drawFlower, drawLeaf, drawPetal, drawSparkle } from './deco.ts';
 import { mulberry32 } from './board.ts';
 
 type Ctx2D = CanvasRenderingContext2D;
@@ -27,19 +18,33 @@ const PEONY_COLORS: Array<[string, string]> = [
   ['#ffc2d6', '#ff6f91'],
 ];
 
-let bgImage: HTMLImageElement | null = null;
-let bgImageReady = false;
+interface Asset {
+  img: HTMLImageElement;
+  ready: boolean;
+}
 
-function loadBgImage(onReady: () => void): HTMLImageElement {
-  if (!bgImage) {
-    bgImage = new Image();
-    bgImage.src = './bg-mockup.jpg';
-    bgImage.onload = () => {
-      bgImageReady = true;
-      onReady();
-    };
-  }
-  return bgImage;
+function loadAsset(src: string, onReady: () => void): Asset {
+  const img = new Image();
+  const asset: Asset = { img, ready: false };
+  img.src = src;
+  img.onload = () => {
+    asset.ready = true;
+    onReady();
+  };
+  return asset;
+}
+
+let bgImage: Asset | null = null;
+// The real tassel artwork cropped straight out of the mockup photo (rather than
+// a procedural recreation, which didn't match the owner's reference closely
+// enough), feathered at the edges so it blends into the decoration layer below.
+let tasselLeft: Asset | null = null;
+let tasselRight: Asset | null = null;
+
+function loadAssets(onReady: () => void): void {
+  if (!bgImage) bgImage = loadAsset('./bg-mockup.jpg', onReady);
+  if (!tasselLeft) tasselLeft = loadAsset('./tassel-left.png', onReady);
+  if (!tasselRight) tasselRight = loadAsset('./tassel-right.png', onReady);
 }
 
 function fillFallbackGradient(ctx: CanvasRenderingContext2D, w: number, h: number): void {
@@ -82,7 +87,13 @@ function blossomBranch(ctx: Ctx2D, cx: number, cy: number, dirX: number, dirY: n
 
 /** Viewport-relative decorations (tassels, blossom branches, scattered flowers) that
  * can't be cropped out by the mockup photo's cover-fit, since they aren't part of it. */
-function drawProceduralDecoration(ctx: Ctx2D, w: number, h: number): void {
+function drawProceduralDecoration(
+  ctx: Ctx2D,
+  w: number,
+  h: number,
+  tasselLeftAsset: Asset | null,
+  tasselRightAsset: Asset | null,
+): void {
   const rng = mulberry32(2026);
   const unit = Math.min(w, h);
 
@@ -123,12 +134,17 @@ function drawProceduralDecoration(ctx: Ctx2D, w: number, h: number): void {
 
   // Hanging knot-tassel ornaments flanking the board (approximate position --
   // the board itself is centered by CSS grid, so this estimates where its
-  // edges typically sit rather than reading the live layout).
+  // edges typically sit rather than reading the live layout). Real artwork
+  // cropped from the mockup photo, not a procedural recreation.
   ctx.globalAlpha = 0.95;
-  const tasselY = h * 0.3;
-  const tasselSize = unit * 0.16;
-  drawTasselKnot(ctx, w / 2 - unit * 0.47, tasselY, tasselSize, '#d98fae', ['#ff9ab0', '#ff7a98']);
-  drawTasselKnot(ctx, w / 2 + unit * 0.47, tasselY, tasselSize, '#8899b0', ['#ff9ab0', '#ffd84d', '#7ec8ff', '#c59bff']);
+  const drawTassel = (asset: Asset | null, cx: number): void => {
+    if (!asset || !asset.ready) return;
+    const targetH = Math.min(h * 0.6, unit * 1.05);
+    const targetW = targetH * (asset.img.naturalWidth / asset.img.naturalHeight);
+    ctx.drawImage(asset.img, cx - targetW / 2, h * 0.04, targetW, targetH);
+  };
+  drawTassel(tasselLeftAsset, w / 2 - unit * 0.47);
+  drawTassel(tasselRightAsset, w / 2 + unit * 0.47);
 
   // Bottom-left: a daisy/wildflower patch.
   ctx.globalAlpha = 0.95;
@@ -183,12 +199,13 @@ export function drawBackground(canvas: HTMLCanvasElement): void {
   const ctx = canvas.getContext('2d')!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const img = loadBgImage(() => drawBackground(canvas));
+  loadAssets(() => drawBackground(canvas));
 
-  if (!bgImageReady || img.naturalWidth === 0) {
+  if (!bgImage?.ready || bgImage.img.naturalWidth === 0) {
     fillFallbackGradient(ctx, w, h);
     return;
   }
+  const img = bgImage.img;
 
   const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
   const dw = img.naturalWidth * scale;
@@ -205,6 +222,6 @@ export function drawBackground(canvas: HTMLCanvasElement): void {
   const imageAspect = img.naturalWidth / img.naturalHeight;
   const visibleWidthFraction = Math.min(1, w / h / imageAspect);
   if (visibleWidthFraction < 0.5) {
-    drawProceduralDecoration(ctx, w, h);
+    drawProceduralDecoration(ctx, w, h, tasselLeft, tasselRight);
   }
 }
