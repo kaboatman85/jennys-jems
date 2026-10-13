@@ -52,12 +52,14 @@ header {
 }
 
 #screen-levels,
-#screen-game {
+#screen-game,
+#screen-blocks {
   grid-row: 2;
 }
 
 #footer-levels,
-#footer-game {
+#footer-game,
+#footer-blocks {
   grid-row: 3;
 }
 
@@ -232,7 +234,8 @@ footer {
   box-shadow: 0 4px 0 #7c6f87, 0 8px 14px rgba(60, 20, 90, 0.2);
 }
 
-#toast {
+#toast,
+#blocks-toast {
   position: absolute;
   left: 50%;
   top: 46%;
@@ -249,7 +252,8 @@ footer {
   text-shadow: 0 5px 14px rgba(70, 10, 80, 0.5);
 }
 
-#toast.show {
+#toast.show,
+#blocks-toast.show {
   animation: pop 1s ease-out forwards;
 }
 
@@ -273,6 +277,57 @@ footer {
 .levels-toolbar {
   display: flex;
   justify-content: center;
+  gap: 12px;
+}
+
+/* Block puzzle */
+#screen-blocks {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 4px;
+  gap: 4px;
+}
+
+.blocks-hud {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pill.compact {
+  min-width: 0;
+  padding: 4px 16px 6px;
+  border-radius: 22px;
+  margin-top: 0;
+  align-self: auto;
+}
+
+#footer-blocks {
+  gap: 8px;
+}
+
+#footer-blocks .btn {
+  white-space: nowrap;
+  padding: 8px 14px;
+  font-size: clamp(14px, 4vw, 20px);
+}
+
+.blocks-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+#blocks-canvas {
+  display: block;
+  touch-action: none;
+}
+
+.blocks-frame {
+  position: absolute;
+  pointer-events: none;
 }
 
 .levels-grid {

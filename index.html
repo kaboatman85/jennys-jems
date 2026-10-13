@@ -23,6 +23,7 @@
       <main id="screen-levels" class="screen">
         <div class="levels-toolbar">
           <button class="btn" id="endless-btn" type="button">엔드리스 <span class="en">Endless</span></button>
+          <button class="btn sound" id="blocks-btn" type="button">블록 <span class="en">Blocks</span></button>
         </div>
         <div id="levels-grid" class="levels-grid" role="list"></div>
       </main>
@@ -51,6 +52,36 @@
         </div>
       </main>
 
+      <main id="screen-blocks" class="screen hidden">
+        <div class="blocks-hud">
+          <div class="pill compact" id="blocks-pill-score">
+            <span class="kr">점수</span>
+            <span class="en">Score</span>
+            <span class="val" id="blocks-score">0</span>
+          </div>
+          <div class="pill compact" id="blocks-pill-stage">
+            <span class="kr">단계</span>
+            <span class="en">Stage</span>
+            <span class="val" id="blocks-stage">1</span>
+          </div>
+          <div class="pill compact" id="blocks-pill-best">
+            <span class="kr">최고</span>
+            <span class="en">Best</span>
+            <span class="val" id="blocks-best">0</span>
+          </div>
+        </div>
+        <div class="blocks-wrap" id="blocks-wrap">
+          <canvas id="blocks-canvas" aria-label="블록 퍼즐 보드"></canvas>
+          <div class="blocks-frame" id="blocks-frame" aria-hidden="true">
+            <img class="frame-corner frame-tl" src="frame-tl.png" alt="" />
+            <img class="frame-corner frame-tr" src="frame-tr.png" alt="" />
+            <img class="frame-corner frame-bl" src="frame-bl.png" alt="" />
+            <img class="frame-corner frame-br" src="frame-br.png" alt="" />
+          </div>
+          <div id="blocks-toast" aria-live="polite"></div>
+        </div>
+      </main>
+
       <footer id="footer-levels">
         <button class="btn sound" id="sound" type="button" aria-pressed="true">소리: On</button>
       </footer>
@@ -60,6 +91,22 @@
         <button class="btn" id="new-game" type="button">새 게임</button>
         <button class="btn sound" id="sound-game" type="button" aria-pressed="true">소리: On</button>
       </footer>
+      <footer id="footer-blocks" class="hidden">
+        <button class="btn menu" id="blocks-back-btn" type="button">목록 <span class="en">Menu</span></button>
+        <button class="btn" id="blocks-new-btn" type="button">새 게임</button>
+        <button class="btn sound" id="sound-blocks" type="button" aria-pressed="true">소리: On</button>
+      </footer>
+    </div>
+
+    <div id="blocks-end-overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <h2 id="blocks-end-title">게임 오버! Game Over</h2>
+        <p id="blocks-end-detail"></p>
+        <div class="overlay-actions">
+          <button class="btn menu" id="blocks-end-menu-btn" type="button">목록 <span class="en">Menu</span></button>
+          <button class="btn" id="blocks-end-again-btn" type="button">다시 <span class="en">Again</span></button>
+        </div>
+      </div>
     </div>
 
     <div id="level-end-overlay" class="overlay hidden">

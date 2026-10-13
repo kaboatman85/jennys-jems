@@ -65,8 +65,11 @@ src/
                        newGame() (endless) and startLevel(config) (level mode) entry points.
   board-input.ts      Pointer/swipe input -> swap intents, gated by an isPlayable() callback.
   board-render.ts      Board frame pre-render + per-frame draw, mask-aware.
-  deco.ts             Canvas flower/leaf painters (used by bg.ts and the board frame).
-  bg.ts               Page background: pastel gradient + scattered flowers.
+  deco.ts             Canvas flower/leaf painters. Currently unused (the owner's artwork replaced the
+                       procedural decoration); safe to delete.
+  bg.ts               Page background: the owner's artwork (public/bg-mockup.jpg), cover-fit, gradient fallback.
+  blocks.ts           Pure block-puzzle engine (see "Block puzzle" below).
+  blocks-game.ts      Canvas front-end for the block puzzle: drag-and-drop, preview, clear effects.
   audio.ts            WebAudio synthesized sound effects (no audio files). Mute persists.
   storage.ts          Guarded localStorage wrappers (loadJSON / saveJSON).
   main.ts             Wires DOM: level-select screen, game screen (endless + level mode), HUD,
@@ -191,6 +194,30 @@ Logic lives in `specials.ts` (`planSpecials`, `expandActivation`, `comboActivati
   it; the owner is comfortable with ADB.
 - Sound was synthesized and the logic runs error-free, but **nobody has confirmed how it sounds on a real
   device yet.** Ask Albert.
+
+## Block puzzle (second game, added after Milestone 5)
+
+A Block Blast / 1010!-style game that lives inside the app as its own screen (`#screen-blocks`), opened
+from the "블록 Blocks" button next to Endless on the level-select screen. Drag one of three pieces from the
+tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no tray piece fits anywhere.
+
+- **Engine (`blocks.ts`, pure, 14 tests in `tests/blocks.test.ts`):** 29 shapes in 3 tiers. Difficulty is a
+  *stage* derived from score (`stageFor`: sqrt(score/40), capped at 10, shown 1-based in the HUD).
+  `tierShares(stage)` controls the draw mix: stage 0 = starter shapes only (dot, 2-3 bars, 2x2), tier 2
+  (4-bars, small L, 2x3) from stage 1, tier 3 (5-bars, big L, T, S/Z, 3x3) from stage 3. Below
+  `FAIR_TRAY_BELOW_STAGE` (6) a tray always contains a placeable piece (`nextTray`, with a forced-fit
+  fallback); from stage 6 up it doesn't, which is the difficulty.
+- **Scoring:** 1 per block placed, 10 x lines^2 per clear, +20 per extra move in a clearing streak.
+- **Front-end (`blocks-game.ts`):** one canvas holds board + tray. Held piece floats ~0.9 cell above the
+  finger and snaps to the nearest grid position; a translucent ghost shows where it lands and rows/columns
+  it would clear glow gold. `onLayout` reports the board rect so `main.ts` can size the `.blocks-frame`
+  overlay (the four `frame-*.png` corner pieces) around it.
+- **Storage:** `jj.blocks.best`. A game in progress is not saved (leaving to the menu abandons it).
+- **Test hooks:** with `?debug`, `window.__blocks` (`.state`, `.tryPlace(slot, r, c)`, `.step(now)` to pump a
+  frame) and `window.__startBlocks()`.
+- **Ideas not built yet:** a proper home hub instead of a button on the level screen, saved in-progress
+  games, more stage-driven difficulty (pre-filled junk cells, fewer fair trays), sound beyond reusing the
+  match-game effects, and a block level map like the gem game's.
 
 ## Known gaps / tech debt
 

@@ -6,6 +6,7 @@ import { sfx } from './audio.ts';
 import { drawBackground } from './bg.ts';
 import { allLevelIds, generateLevel } from './levelgen.ts';
 import { isUnlocked, loadProgress, recordWin } from './levels-progress.ts';
+import { BlockGame } from './blocks-game.ts';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -35,6 +36,24 @@ const levelEndDetail = el<HTMLElement>('level-end-detail');
 const overlayMenuBtn = el<HTMLButtonElement>('overlay-menu-btn');
 const overlayRetryBtn = el<HTMLButtonElement>('overlay-retry-btn');
 const overlayNextBtn = el<HTMLButtonElement>('overlay-next-btn');
+const blocksBtn = el<HTMLButtonElement>('blocks-btn');
+const screenBlocks = el<HTMLElement>('screen-blocks');
+const footerBlocks = el<HTMLElement>('footer-blocks');
+const blocksWrap = el<HTMLElement>('blocks-wrap');
+const blocksCanvas = el<HTMLCanvasElement>('blocks-canvas');
+const blocksFrame = el<HTMLElement>('blocks-frame');
+const blocksToast = el<HTMLElement>('blocks-toast');
+const blocksScoreEl = el<HTMLElement>('blocks-score');
+const blocksBestEl = el<HTMLElement>('blocks-best');
+const blocksStageEl = el<HTMLElement>('blocks-stage');
+const blocksBackBtn = el<HTMLButtonElement>('blocks-back-btn');
+const blocksNewBtn = el<HTMLButtonElement>('blocks-new-btn');
+const soundBlocksBtn = el<HTMLButtonElement>('sound-blocks');
+const blocksEndOverlay = el<HTMLElement>('blocks-end-overlay');
+const blocksEndTitle = el<HTMLElement>('blocks-end-title');
+const blocksEndDetail = el<HTMLElement>('blocks-end-detail');
+const blocksEndMenuBtn = el<HTMLButtonElement>('blocks-end-menu-btn');
+const blocksEndAgainBtn = el<HTMLButtonElement>('blocks-end-again-btn');
 
 const fmt = (n: number): string => n.toLocaleString('en-US');
 
@@ -65,6 +84,35 @@ const game = new Game(board, new GemSprites(), {
   },
   onLevelFailed({ score }) {
     showLevelEnd(false, 0, score, null, null);
+  },
+});
+
+const blocks = new BlockGame(blocksCanvas, {
+  onScore(score, best) {
+    blocksScoreEl.textContent = fmt(score);
+    blocksBestEl.textContent = fmt(best);
+  },
+  onStage(stage) {
+    blocksStageEl.textContent = String(stage + 1);
+  },
+  onToast(text) {
+    blocksToast.textContent = text;
+    blocksToast.classList.remove('show');
+    void blocksToast.offsetWidth; // restart the CSS animation
+    blocksToast.classList.add('show');
+  },
+  onLayout(rect) {
+    Object.assign(blocksFrame.style, {
+      left: `${rect.x}px`,
+      top: `${rect.y}px`,
+      width: `${rect.w}px`,
+      height: `${rect.h}px`,
+    });
+  },
+  onGameOver({ score, best, newBest }) {
+    blocksEndTitle.textContent = newBest ? '새 기록! New Best!' : '게임 오버! Game Over';
+    blocksEndDetail.textContent = `점수 Score ${fmt(score)} · 최고 Best ${fmt(best)}`;
+    blocksEndOverlay.classList.remove('hidden');
   },
 });
 
@@ -117,12 +165,25 @@ function relayoutBoard(): void {
   game.layout(boardWrap.clientWidth, boardWrap.clientHeight);
 }
 
-function showScreen(which: 'levels' | 'game'): void {
+function relayoutBlocks(): void {
+  if (screenBlocks.classList.contains('hidden')) return;
+  blocks.layout(blocksWrap.clientWidth, blocksWrap.clientHeight);
+}
+
+function showScreen(which: 'levels' | 'game' | 'blocks'): void {
   screenLevels.classList.toggle('hidden', which !== 'levels');
   screenGame.classList.toggle('hidden', which !== 'game');
+  screenBlocks.classList.toggle('hidden', which !== 'blocks');
   footerLevels.classList.toggle('hidden', which !== 'levels');
   footerGame.classList.toggle('hidden', which !== 'game');
+  footerBlocks.classList.toggle('hidden', which !== 'blocks');
   if (which === 'game') relayoutBoard();
+  if (which === 'blocks') {
+    relayoutBlocks();
+    blocks.start();
+  } else {
+    blocks.stop();
+  }
 }
 
 function renderLevelGrid(): void {
@@ -211,9 +272,33 @@ newGameBtn.addEventListener('click', () => {
   void game.newGame();
 });
 
+function startBlocks(): void {
+  blocksEndOverlay.classList.add('hidden');
+  blocks.newGame();
+  showScreen('blocks');
+}
+blocksBtn.addEventListener('click', () => {
+  sfx.unlock();
+  startBlocks();
+});
+blocksNewBtn.addEventListener('click', () => {
+  sfx.unlock();
+  startBlocks();
+});
+blocksBackBtn.addEventListener('click', () => {
+  renderLevelGrid();
+  showScreen('levels');
+});
+blocksEndAgainBtn.addEventListener('click', startBlocks);
+blocksEndMenuBtn.addEventListener('click', () => {
+  blocksEndOverlay.classList.add('hidden');
+  renderLevelGrid();
+  showScreen('levels');
+});
+
 function renderSoundButton(): void {
   const label = sfx.muted ? '소리: Off' : '소리: On';
-  for (const btn of [soundBtn, soundGameBtn]) {
+  for (const btn of [soundBtn, soundGameBtn, soundBlocksBtn]) {
     btn.textContent = label;
     btn.setAttribute('aria-pressed', String(!sfx.muted));
     btn.classList.toggle('off', sfx.muted);
@@ -229,13 +314,16 @@ function toggleSound(): void {
 }
 soundBtn.addEventListener('click', toggleSound);
 soundGameBtn.addEventListener('click', toggleSound);
+soundBlocksBtn.addEventListener('click', toggleSound);
 renderSoundButton();
 
 window.addEventListener('resize', () => {
   relayoutBg();
   relayoutBoard();
+  relayoutBlocks();
 });
 new ResizeObserver(() => relayoutBoard()).observe(boardWrap);
+new ResizeObserver(() => relayoutBlocks()).observe(blocksWrap);
 
 relayoutBg();
 renderLevelGrid();
@@ -249,6 +337,8 @@ if (new URLSearchParams(location.search).has('debug')) {
       __generateLevel: (id: number) => ReturnType<typeof generateLevel>;
     }
   ).__game = game;
+  (window as unknown as { __blocks: BlockGame }).__blocks = blocks;
+  (window as unknown as { __startBlocks: () => void }).__startBlocks = startBlocks;
   (window as unknown as { __launchLevel: (id: number) => void }).__launchLevel = launchLevel;
   (window as unknown as { __generateLevel: typeof generateLevel }).__generateLevel = generateLevel;
 }
