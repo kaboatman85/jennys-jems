@@ -1,0 +1,17 @@
+{
+  "name": "Jenny's Jems",
+  "short_name": "Jenny's Jems",
+  "description": "제니의 보석 -- a floral match-3 game, 100 levels.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffd3ea",
+  "theme_color": "#e3b65c",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

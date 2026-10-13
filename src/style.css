@@ -46,8 +46,19 @@ body {
 }
 
 header {
+  grid-row: 1;
   text-align: center;
   padding: 10px 12px 2px;
+}
+
+#screen-levels,
+#screen-game {
+  grid-row: 2;
+}
+
+#footer-levels,
+#footer-game {
+  grid-row: 3;
 }
 
 h1 {
@@ -121,7 +132,7 @@ h1 {
   line-height: 1.2;
 }
 
-#stage {
+#screen-game {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
@@ -223,6 +234,199 @@ footer {
 
 #toast.show {
   animation: pop 1s ease-out forwards;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.screen {
+  min-height: 0;
+}
+
+/* Level select */
+#screen-levels {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 4px 14px 8px;
+  gap: 8px;
+}
+
+.levels-toolbar {
+  display: flex;
+  justify-content: center;
+}
+
+.levels-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 10px;
+  padding: 6px 2px 16px;
+}
+
+.level-btn {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  aspect-ratio: 1;
+  background: rgba(255, 246, 232, 0.92);
+  border: 3px solid var(--gold);
+  border-radius: 18px;
+  box-shadow: 0 3px 0 rgba(201, 148, 58, 0.45);
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.level-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(201, 148, 58, 0.45);
+}
+
+.level-btn .num {
+  font-weight: 800;
+  font-size: clamp(14px, 3vw, 20px);
+}
+
+.level-btn .stars {
+  font-size: clamp(9px, 2vw, 13px);
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+
+.level-btn.locked {
+  background: rgba(200, 180, 190, 0.55);
+  border-color: #b8a0ac;
+  color: #8a7580;
+  cursor: default;
+  box-shadow: none;
+}
+
+.level-btn.locked:active {
+  transform: none;
+}
+
+/* Objectives bar (level mode only) */
+#objectives-bar {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.objective-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 246, 232, 0.95);
+  border: 2px solid var(--gold);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 800;
+  font-size: clamp(11px, 2.6vw, 15px);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.objective-chip.done {
+  color: #fff;
+  background: linear-gradient(#8fd98c, #4fae55);
+  border-color: #3c8a40;
+}
+
+.objective-chip .swatch {
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 760px) {
+  #objectives-bar {
+    position: static;
+    transform: none;
+    order: 1;
+    flex-basis: 100%;
+    margin-bottom: 4px;
+    pointer-events: auto;
+  }
+}
+
+.btn.menu {
+  background: linear-gradient(#f3cf7e, var(--gold));
+  box-shadow: 0 4px 0 #a07426, 0 8px 14px rgba(120, 80, 20, 0.25);
+}
+
+.btn.menu:active {
+  box-shadow: 0 1px 0 #a07426;
+}
+
+/* Level complete / failed overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(60, 20, 50, 0.45);
+  padding: 16px;
+}
+
+.overlay-card {
+  background: linear-gradient(#fff6e8, #ffe9c4);
+  border: 4px solid var(--gold);
+  border-radius: 28px;
+  padding: 24px 28px;
+  max-width: min(420px, 92vw);
+  text-align: center;
+  box-shadow: 0 10px 0 rgba(201, 148, 58, 0.4), 0 20px 30px rgba(90, 40, 20, 0.35);
+}
+
+.overlay-card h2 {
+  margin: 0 0 8px;
+  font-size: clamp(22px, 5vw, 30px);
+  color: var(--pink-dark);
+}
+
+.overlay-card .stars {
+  font-size: clamp(28px, 7vw, 40px);
+  letter-spacing: 6px;
+  color: var(--gold);
+  margin: 6px 0;
+}
+
+.overlay-card .stars .empty {
+  color: rgba(201, 148, 58, 0.25);
+}
+
+.overlay-card p {
+  margin: 4px 0 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.overlay-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 @keyframes pop {

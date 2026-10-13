@@ -7,6 +7,9 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#e3b65c" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <title>Jenny's Jems</title>
   </head>
   <body>
@@ -16,27 +19,56 @@
         <h1>Jenny's Jems</h1>
         <p class="subtitle"><span class="deco">〜</span> 제니의 보석 <span class="deco">〜</span></p>
       </header>
-      <main id="stage">
+
+      <main id="screen-levels" class="screen">
+        <div class="levels-toolbar">
+          <button class="btn" id="endless-btn" type="button">엔드리스 <span class="en">Endless</span></button>
+        </div>
+        <div id="levels-grid" class="levels-grid" role="list"></div>
+      </main>
+
+      <main id="screen-game" class="screen hidden">
         <div class="pill" id="pill-score">
-          <span class="kr">점수</span>
-          <span class="en">Score</span>
+          <span class="kr" id="pill-score-kr">점수</span>
+          <span class="en" id="pill-score-en">Score</span>
           <span class="val" id="score">0</span>
         </div>
         <div class="board-wrap">
+          <div id="objectives-bar" class="hidden"></div>
           <canvas id="board" aria-label="게임 보드"></canvas>
           <div id="toast" aria-live="polite"></div>
         </div>
         <div class="pill" id="pill-best">
-          <span class="kr">최고</span>
-          <span class="en">Best</span>
+          <span class="kr" id="pill-best-kr">최고</span>
+          <span class="en" id="pill-best-en">Best</span>
           <span class="val" id="best">0</span>
         </div>
       </main>
-      <footer>
-        <button class="btn" id="new-game" type="button">새 게임</button>
+
+      <footer id="footer-levels">
         <button class="btn sound" id="sound" type="button" aria-pressed="true">소리: On</button>
       </footer>
+
+      <footer id="footer-game" class="hidden">
+        <button class="btn menu" id="back-btn" type="button">목록 <span class="en">Menu</span></button>
+        <button class="btn" id="new-game" type="button">새 게임</button>
+        <button class="btn sound" id="sound-game" type="button" aria-pressed="true">소리: On</button>
+      </footer>
     </div>
+
+    <div id="level-end-overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <h2 id="level-end-title">레벨 클리어!</h2>
+        <div id="level-end-stars" class="stars" aria-hidden="true"></div>
+        <p id="level-end-detail"></p>
+        <div class="overlay-actions">
+          <button class="btn menu" id="overlay-menu-btn" type="button">목록 <span class="en">Menu</span></button>
+          <button class="btn sound" id="overlay-retry-btn" type="button">다시 <span class="en">Retry</span></button>
+          <button class="btn" id="overlay-next-btn" type="button">다음 <span class="en">Next</span></button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
