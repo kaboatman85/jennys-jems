@@ -69,7 +69,7 @@ const game = new Game(board, new GemSprites(), {
 });
 
 const OBJECTIVE_ICON: Record<ObjectiveProgressView['kind'], string> = {
-  score: '🎯',
+  score: '',
   clearTiles: '🧊',
   dropItems: '🎁',
   collectColor: '',
@@ -91,7 +91,7 @@ function renderObjectives(progress: ObjectiveProgressView[]): void {
       swatch.className = 'swatch';
       swatch.style.background = GEM_DEFS[o.color]?.base ?? '#ccc';
       chip.appendChild(swatch);
-    } else {
+    } else if (OBJECTIVE_ICON[o.kind]) {
       chip.append(`${OBJECTIVE_ICON[o.kind]} `);
     }
     chip.append(`${OBJECTIVE_LABEL[o.kind]} ${Math.min(o.current, o.target)}/${o.target}`);

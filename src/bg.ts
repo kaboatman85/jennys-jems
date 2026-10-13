@@ -1,6 +1,5 @@
-// Page background: the owner's artwork drawn cover-fit, with a transparent
-// floral frame overlay (same dimensions, same cover-fit transform) on top.
-// Falls back to a plain gradient until the images load.
+// Page background: the owner's artwork drawn cover-fit.
+// Falls back to a plain gradient until the image loads.
 
 interface Asset {
   img: HTMLImageElement;
@@ -19,12 +18,6 @@ function loadAsset(src: string, onReady: () => void): Asset {
 }
 
 let bgImage: Asset | null = null;
-let frameImage: Asset | null = null;
-
-function loadAssets(onReady: () => void): void {
-  if (!bgImage) bgImage = loadAsset('./bg-mockup.jpg', onReady);
-  if (!frameImage) frameImage = loadAsset('./frame.png', onReady);
-}
 
 function fillFallbackGradient(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const g = ctx.createLinearGradient(0, 0, w * 0.4, h);
@@ -35,14 +28,7 @@ function fillFallbackGradient(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.fillRect(0, 0, w, h);
 }
 
-function drawCoverFit(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number): void {
-  const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-  const dw = img.naturalWidth * scale;
-  const dh = img.naturalHeight * scale;
-  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-}
-
-/** Paints the page background and floral frame overlay, both cover-fit. */
+/** Paints the page background, cover-fit. */
 export function drawBackground(canvas: HTMLCanvasElement): void {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -52,16 +38,16 @@ export function drawBackground(canvas: HTMLCanvasElement): void {
   const ctx = canvas.getContext('2d')!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  loadAssets(() => drawBackground(canvas));
+  if (!bgImage) bgImage = loadAsset('./bg-mockup.jpg', () => drawBackground(canvas));
 
-  if (!bgImage?.ready || bgImage.img.naturalWidth === 0) {
+  if (!bgImage.ready || bgImage.img.naturalWidth === 0) {
     fillFallbackGradient(ctx, w, h);
     return;
   }
 
-  drawCoverFit(ctx, bgImage.img, w, h);
-
-  if (frameImage?.ready && frameImage.img.naturalWidth > 0) {
-    drawCoverFit(ctx, frameImage.img, w, h);
-  }
+  const img = bgImage.img;
+  const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
 }
