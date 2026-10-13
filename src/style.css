@@ -167,13 +167,13 @@ h1 {
   position: absolute;
   pointer-events: none;
   z-index: 1;
-  height: 55%;
+  height: 38%;
   width: auto;
 }
-.frame-tl { top: -4%; left: -6%; }
-.frame-tr { top: -4%; right: -10%; }
-.frame-bl { bottom: -2%; left: -6%; }
-.frame-br { bottom: -2%; right: -6%; }
+.frame-tl { top: -6%; left: -10%; }
+.frame-tr { top: -6%; right: -14%; }
+.frame-bl { bottom: -4%; left: -10%; }
+.frame-br { bottom: -4%; right: -10%; }
 
 /* Narrow/portrait screens: pills group above the board instead of flanking it. */
 @media (max-width: 760px) {
