@@ -7,6 +7,7 @@ import {
   areAdjacent,
   cellsOfRuns,
   collapse,
+  collectDroppedItems,
   createGrid,
   findMoves,
   findRuns,
@@ -16,7 +17,7 @@ import {
   swapCells,
   wouldMatch,
 } from '../src/board.ts';
-import type { Grid } from '../src/board.ts';
+import type { Grid, Mask } from '../src/board.ts';
 
 function gridFrom(rows: number[][]): Grid {
   return rows.map((row) => row.map((t) => newGem(t)));
@@ -162,6 +163,136 @@ test('shuffleGrid yields a playable board and keeps the same gem objects', () =>
     const after = new Set(g.flat().map((x) => x!.id));
     assert.deepEqual([...after].sort(), [...before].sort());
   }
+});
+
+function fullMask(rows: number, cols: number): Mask {
+  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => true));
+}
+
+test('createGrid: respects a mask -- blocked cells stay null, playable region is clean', () => {
+  const mask = fullMask(6, 6);
+  for (let c = 0; c < 6; c++) mask[3]![c] = false; // block row 3 entirely
+  for (let seed = 1; seed <= 100; seed++) {
+    const g = createGrid(6, 6, TYPES, mulberry32(seed), mask);
+    for (let c = 0; c < 6; c++) assert.equal(g[3]![c], null, `seed ${seed}: blocked cell not null`);
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 6; c++) {
+        if (r !== 3) assert.ok(g[r]![c], `seed ${seed}: playable cell (${r},${c}) is empty`);
+      }
+    }
+    assert.equal(findRuns(g).length, 0, `seed ${seed} has a starting match`);
+    assert.ok(findMoves(g).length > 0, `seed ${seed} has no moves`);
+  }
+});
+
+test('collapse: a masked column falls in independent segments around a blocked row', () => {
+  const mask = fullMask(6, 1);
+  mask[3]![0] = false; // blocks row 3 in the single column
+  const rng = mulberry32(11);
+  const g: Grid = [[newGem(0)], [newGem(1)], [newGem(2)], [null], [newGem(3)], [newGem(4)]];
+  // Knock out one cell in the top segment (rows 0-2) and one in the bottom segment (rows 4-5).
+  g[0]![0] = null;
+  g[5]![0] = null;
+  const survivorTop = g[1]![0]!;
+  const survivorBottom = g[4]![0]!;
+
+  const { falls, spawns } = collapse(g, TYPES, rng, mask);
+
+  assert.equal(g[3]![0], null, 'blocked cell must stay null');
+  assert.ok(g[0]![0] && g[1]![0] && g[2]![0], 'top segment fully filled');
+  assert.ok(g[4]![0] && g[5]![0], 'bottom segment fully filled');
+  // The bottom segment's spawn must not have a fromR that lands inside the top
+  // segment's row range (0-2), or it would visually fly through unrelated gems.
+  for (const s of spawns) {
+    if (s.toR >= 4) assert.ok(s.toR - s.fromR >= 1, 'bottom-segment spawn falls a sensible distance');
+  }
+  const survivors = new Set([survivorTop.id, survivorBottom.id]);
+  for (const f of falls) if (survivors.has(f.gem.id)) survivors.delete(f.gem.id);
+  // Both survivors should still be present somewhere in their own segment.
+  assert.ok([g[0]![0], g[1]![0], g[2]![0]].some((x) => x?.id === survivorTop.id));
+  assert.ok([g[4]![0], g[5]![0]].some((x) => x?.id === survivorBottom.id));
+});
+
+test('shuffleGrid: respects a mask -- blocked cells stay blocked, gem set unchanged', () => {
+  const mask = fullMask(6, 6);
+  for (let c = 0; c < 6; c++) mask[3]![c] = false;
+  for (let seed = 1; seed <= 30; seed++) {
+    const rng = mulberry32(seed);
+    const g = createGrid(6, 6, TYPES, rng, mask);
+    const before = new Set(g.flat().filter(Boolean).map((x) => x!.id));
+    shuffleGrid(g, TYPES, rng, mask);
+    for (let c = 0; c < 6; c++) assert.equal(g[3]![c], null);
+    assert.equal(findRuns(g).length, 0);
+    assert.ok(findMoves(g).length > 0);
+    const after = new Set(g.flat().filter(Boolean).map((x) => x!.id));
+    assert.deepEqual([...after].sort(), [...before].sort());
+  }
+});
+
+test('findRuns: an obstacle-covered gem is inert -- never forms or extends a match', () => {
+  const g = gridFrom([[0, 0, 0, 1]]);
+  g[0]![1]!.obstacle = { kind: 'ice', hits: 1 };
+  // The run that used to span cols 0-2 is now broken by the frozen cell at col 1.
+  assert.equal(findRuns(g).length, 0);
+});
+
+test('findRuns: a dropItem gem is inert -- never forms or extends a match', () => {
+  const g = gridFrom([[0, 0, 0, 1]]);
+  g[0]![1]!.dropItem = true;
+  assert.equal(findRuns(g).length, 0);
+});
+
+test('findMoves: never offers a swap into or out of a frozen (obstacle) cell', () => {
+  const g = gridFrom([
+    [9, 0, 9],
+    [9, 1, 0],
+    [9, 0, 0],
+  ]);
+  // Without the obstacle this swap is legal (see the 2x2-block test above).
+  assert.ok(wouldMatch(g, { r: 0, c: 1 }, { r: 1, c: 1 }));
+  g[1]![1]!.obstacle = { kind: 'ice', hits: 1 };
+  const moves = findMoves(g);
+  assert.ok(
+    !moves.some(
+      (m) =>
+        (m.a.r === 1 && m.a.c === 1) ||
+        (m.b.r === 1 && m.b.c === 1),
+    ),
+    'no move should involve the frozen cell',
+  );
+});
+
+test('collectDroppedItems: collects an item sitting in the bottom row of its column', () => {
+  const g = gridFrom([
+    [0, 0],
+    [1, 1],
+  ]);
+  g[1]![0]!.dropItem = true;
+  const collected = collectDroppedItems(g);
+  assert.equal(collected.length, 1);
+  assert.deepEqual(collected[0], { r: 1, c: 0 });
+  assert.ok(g[1]![0], 'read-only: the caller removes the cell, not collectDroppedItems itself');
+});
+
+test('collectDroppedItems: ignores an item that has not reached the bottom yet', () => {
+  const g = gridFrom([
+    [0, 0],
+    [1, 1],
+  ]);
+  g[0]![0]!.dropItem = true; // top row, not yet at the bottom
+  const collected = collectDroppedItems(g);
+  assert.equal(collected.length, 0);
+  assert.ok(g[0]![0], 'item stays on the board until it reaches bottom');
+});
+
+test('collectDroppedItems: respects a mask -- "bottom" means the lowest playable row', () => {
+  const mask = fullMask(4, 1);
+  mask[3]![0] = false; // row 3 blocked; row 2 is the real bottom of this column
+  const g: Grid = [[newGem(0)], [newGem(1)], [newGem(2)], [null]];
+  g[2]![0]!.dropItem = true;
+  const collected = collectDroppedItems(g, mask);
+  assert.equal(collected.length, 1);
+  assert.deepEqual(collected[0], { r: 2, c: 0 });
 });
 
 test('cascade simulation always terminates with a settled board', () => {

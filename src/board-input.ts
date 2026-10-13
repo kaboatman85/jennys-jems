@@ -2,7 +2,7 @@
 // grid, specials, or animation state — it reports cell positions and intents
 // (select / swap attempt) through callbacks.
 
-import { COLS, ROWS, areAdjacent } from './board.ts';
+import { areAdjacent } from './board.ts';
 import type { Pos } from './board.ts';
 import { sfx } from './audio.ts';
 
@@ -11,10 +11,14 @@ export interface BoardGeometry {
   oy: number;
   cell: number;
   cssW: number;
+  rows: number;
+  cols: number;
 }
 
 export interface BoardInputCallbacks {
   isBusy(): boolean;
+  /** False for a masked-out (no cell) or frozen (obstacle) position -- can't be tapped/dragged. */
+  isPlayable(p: Pos): boolean;
   getSelected(): Pos | null;
   onSelect(p: Pos | null): void;
   onSwapAttempt(a: Pos, b: Pos): void;
@@ -44,7 +48,7 @@ export class BoardInput {
     const y = (e.clientY - rect.top) * scale - g.oy;
     const c = Math.floor(x / g.cell);
     const r = Math.floor(y / g.cell);
-    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+    if (r < 0 || r >= g.rows || c < 0 || c >= g.cols) return null;
     return { r, c };
   }
 
@@ -52,7 +56,7 @@ export class BoardInput {
     sfx.unlock();
     if (this.cb.isBusy()) return;
     const p = this.cellAt(e);
-    if (!p) return;
+    if (!p || !this.cb.isPlayable(p)) return;
     e.preventDefault();
     this.canvas.setPointerCapture(e.pointerId);
     const selected = this.cb.getSelected();
@@ -80,7 +84,8 @@ export class BoardInput {
         ? { r: d.start.r, c: d.start.c + Math.sign(dx) }
         : { r: d.start.r + Math.sign(dy), c: d.start.c };
     this.drag = null;
-    if (target.r < 0 || target.r >= ROWS || target.c < 0 || target.c >= COLS) return;
+    if (target.r < 0 || target.r >= g.rows || target.c < 0 || target.c >= g.cols) return;
+    if (!this.cb.isPlayable(target)) return;
     this.cb.onSelect(null);
     this.cb.onSwapAttempt(d.start, target);
   };

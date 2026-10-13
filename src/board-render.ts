@@ -1,9 +1,9 @@
 // Board chrome (pre-rendered frame) and per-frame drawing. No game-flow logic;
 // just reads the given state and paints it.
 
-import { COLS, ROWS } from './board.ts';
-import type { Grid, Pos } from './board.ts';
-import type { GemArt, OverlayArt } from './gems.ts';
+import { numCols, numRows } from './board.ts';
+import type { Grid, Mask, Pos } from './board.ts';
+import type { GemArt, ObstacleArt, OverlayArt } from './gems.ts';
 import type { Particle } from './particles.ts';
 import type { Sprite } from './sprites.ts';
 import { FLOWER_COLORS, drawFlower, drawLeaf } from './deco.ts';
@@ -28,6 +28,10 @@ export function roundRectPath(
 }
 
 export interface FrameGeometry {
+  rows: number;
+  cols: number;
+  /** Cells with mask[r][c] === false get no checker tile -- there's no slot there. */
+  mask?: Mask;
   cell: number;
   pad: number;
   bleed: number;
@@ -42,7 +46,7 @@ export interface FrameGeometry {
 
 /** Pre-renders the gold cherry-blossom frame, cream board, and checkered cells. */
 export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
-  const { cell, pad, bleed, dpr, cssW, cssH, ox, oy } = geo;
+  const { rows, cols, mask, cell, pad, bleed, dpr, cssW, cssH, ox, oy } = geo;
   const cv = document.createElement('canvas');
   cv.width = geo.canvasW;
   cv.height = geo.canvasH;
@@ -82,10 +86,11 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
   c.strokeStyle = 'rgba(201,148,58,0.65)';
   c.stroke();
 
-  // Checkered cells.
+  // Checkered cells (skipped for masked-out cells -- the cream board shows through).
   const gap = cell * 0.04;
-  for (let r = 0; r < ROWS; r++) {
-    for (let col = 0; col < COLS; col++) {
+  for (let r = 0; r < rows; r++) {
+    for (let col = 0; col < cols; col++) {
+      if (mask && !mask[r]?.[col]) continue;
       rr(ox + col * cell + gap, oy + r * cell + gap, cell - 2 * gap, cell - 2 * gap, cell * 0.14);
       c.fillStyle = (r + col) % 2 ? 'rgba(201,148,58,0.05)' : 'rgba(201,148,58,0.1)';
       c.fill();
@@ -102,12 +107,12 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
     const [petal, center] = FLOWER_COLORS[ci % FLOWER_COLORS.length]!;
     drawFlower(c, x, y, rBand, petal, center, 5, ci);
   };
-  for (let i = 1; i < COLS; i += 2) {
+  for (let i = 1; i < cols; i += 2) {
     const x = ox + i * cell + cell * 0.5 * (i % 2 ? 1 : 0);
     edge(x, midY + pad * 0.1, -Math.PI / 2, i);
     edge(x, by + bh - pad * 0.35, Math.PI / 2, i + 1);
   }
-  for (let i = 1; i < ROWS; i += 2) {
+  for (let i = 1; i < rows; i += 2) {
     const y = oy + i * cell;
     edge(bx + pad * 0.3, y, Math.PI, i + 2);
     edge(bx + bw - pad * 0.3, y, 0, i + 3);
@@ -141,6 +146,8 @@ export interface DrawState {
   selected: Pos | null;
   art: GemArt;
   overlayArt: OverlayArt;
+  obstacleArt: ObstacleArt;
+  dropItemArt: { get(px: number): CanvasImageSource };
 }
 
 export function draw(now: number, s: DrawState): void {
@@ -152,7 +159,7 @@ export function draw(now: number, s: DrawState): void {
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(s.ox, s.oy, COLS * cell, ROWS * cell);
+  ctx.rect(s.ox, s.oy, numCols(s.grid) * cell, numRows(s.grid) * cell);
   ctx.clip();
 
   const pulse = 0.5 + 0.5 * Math.sin(now / 170);
@@ -178,8 +185,14 @@ export function draw(now: number, s: DrawState): void {
     ctx.scale(sp.sx * bump, sp.sy * bump);
     ctx.globalAlpha = Math.max(0, sp.a);
     ctx.drawImage(s.art.get(sp.gem.type, px), -cell / 2, -cell / 2, cell, cell);
-    if (sp.gem.special) {
+    if (sp.gem.obstacle) {
+      // A frozen cell's special (if any) stays hidden underneath the ice/dirt.
+      ctx.drawImage(s.obstacleArt.get(sp.gem.obstacle, px), -cell / 2, -cell / 2, cell, cell);
+    } else if (sp.gem.special) {
       ctx.drawImage(s.overlayArt.get(sp.gem.special, px), -cell / 2, -cell / 2, cell, cell);
+    }
+    if (sp.gem.dropItem) {
+      ctx.drawImage(s.dropItemArt.get(px), -cell / 2, -cell / 2, cell, cell);
     }
     ctx.restore();
   }

@@ -1,7 +1,7 @@
 // Procedural 3D-looking gems. drawGem() only needs a 2D context, so it also
 // runs under node (@napi-rs/canvas) for visual checks.
 
-import type { Special } from './board.ts';
+import type { Obstacle, Special } from './board.ts';
 
 type Ctx2D = CanvasRenderingContext2D;
 type RGB = [number, number, number];
@@ -390,6 +390,154 @@ export class SpecialOverlaySprites implements OverlayArt {
       cv.height = px;
       drawSpecialOverlay(cv.getContext('2d')!, special, px);
       this.cache.set(key, cv);
+    }
+    return cv;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// --- Obstacle overlays: ice (frosted, cracks as it nears breaking) and dirt
+// (rough speckled patch) drawn over the base gem, covering it like the special
+// overlays do. A frozen cell's special (if any) is deliberately not shown
+// underneath -- it can't be seen or activated while covered.
+
+function drawIceOverlay(ctx: Ctx2D, hits: number, S: number): void {
+  const cx = S / 2;
+  const cy = S / 2;
+  ctx.save();
+  ctx.fillStyle = 'rgba(205,232,255,0.6)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.47, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = S * 0.04;
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.43, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Cracks: more of them as it gets closer to breaking (fewer hits remaining).
+  const cracks = hits <= 1 ? 4 : hits === 2 ? 2 : 1;
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = S * 0.022;
+  for (let i = 0; i < cracks; i++) {
+    const a = (i / Math.max(1, cracks)) * Math.PI * 2 + 0.5;
+    const mx = cx + Math.cos(a) * S * 0.22;
+    const my = cy + Math.sin(a) * S * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(mx, my);
+    ctx.lineTo(mx + Math.cos(a + 0.6) * S * 0.14, my + Math.sin(a + 0.6) * S * 0.14);
+    ctx.stroke();
+  }
+  sparkle(ctx, cx - S * 0.18, cy - S * 0.2, S * 0.045, 0.8);
+  ctx.restore();
+}
+
+function drawDirtOverlay(ctx: Ctx2D, S: number): void {
+  const cx = S / 2;
+  const cy = S / 2;
+  ctx.save();
+  ctx.fillStyle = 'rgba(123,88,56,0.6)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.47, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(90,62,38,0.6)';
+  ctx.lineWidth = S * 0.03;
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.43, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(96,66,42,0.55)';
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.ellipse(cx + Math.cos(a) * S * 0.24, cy + Math.sin(a) * S * 0.24, S * 0.08, S * 0.055, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+export function drawObstacleOverlay(ctx: Ctx2D, obstacle: Obstacle, S: number): void {
+  if (obstacle.kind === 'ice') drawIceOverlay(ctx, obstacle.hits, S);
+  else drawDirtOverlay(ctx, S);
+}
+
+export interface ObstacleArt {
+  get(obstacle: Obstacle, px: number): CanvasImageSource;
+  clear?(): void;
+}
+
+export class ObstacleOverlaySprites implements ObstacleArt {
+  private cache = new Map<string, HTMLCanvasElement>();
+
+  get(obstacle: Obstacle, px: number): HTMLCanvasElement {
+    const key = `${obstacle.kind}@${obstacle.hits}@${px}`;
+    let cv = this.cache.get(key);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = px;
+      cv.height = px;
+      drawObstacleOverlay(cv.getContext('2d')!, obstacle, px);
+      this.cache.set(key, cv);
+    }
+    return cv;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// --- Drop-item marker: a small ribboned gift glyph, signaling "deliver me to
+// the bottom" rather than "match me". One look regardless of color/hits.
+
+export function drawDropItemOverlay(ctx: Ctx2D, S: number): void {
+  const cx = S / 2;
+  const cy = S / 2;
+  const bw = S * 0.46;
+  const bh = S * 0.36;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.strokeStyle = 'rgba(120,70,40,0.55)';
+  ctx.lineWidth = S * 0.022;
+  roundRectAt(ctx, cx - bw / 2, cy - bh / 2 + S * 0.03, bw, bh, S * 0.05);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,111,145,0.95)';
+  ctx.fillRect(cx - S * 0.028, cy - bh / 2 + S * 0.03, S * 0.056, bh);
+  ctx.fillRect(cx - bw / 2, cy - S * 0.028, bw, S * 0.056);
+  ctx.beginPath();
+  ctx.ellipse(cx - S * 0.07, cy - bh / 2 + S * 0.02, S * 0.07, S * 0.05, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(cx + S * 0.07, cy - bh / 2 + S * 0.02, S * 0.07, S * 0.05, 0.3, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,111,145,0.95)';
+  ctx.fill();
+  ctx.restore();
+}
+
+function roundRectAt(ctx: Ctx2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rad = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+
+export class DropItemOverlaySprites {
+  private cache = new Map<number, HTMLCanvasElement>();
+
+  get(px: number): HTMLCanvasElement {
+    let cv = this.cache.get(px);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = px;
+      cv.height = px;
+      drawDropItemOverlay(cv.getContext('2d')!, px);
+      this.cache.set(px, cv);
     }
     return cv;
   }

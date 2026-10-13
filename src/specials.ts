@@ -1,7 +1,7 @@
 // Pure special-piece logic: which matches create specials, what they clear, how
 // chains and combo swaps resolve. No DOM, no rendering, no game.ts imports.
 
-import type { Grid, Pos, Run, Special } from './board.ts';
+import type { Gem, Grid, Pos, Run, Special, SpecialKind } from './board.ts';
 import { TYPES, numCols, numRows } from './board.ts';
 export type { Special, SpecialKind } from './board.ts';
 
@@ -14,6 +14,8 @@ export interface ActivationResult {
   cleared: Pos[];
   /** Cleared-gem count per type (index = Gem.type), for color-collection objectives. */
   clearedCounts: number[];
+  /** Obstacle cells that took a hit but didn't break -- still blocking that cell. */
+  damaged: Pos[];
 }
 
 const key = (p: Pos): number => p.r * 1000 + p.c;
@@ -27,9 +29,15 @@ const key = (p: Pos): number => p.r * 1000 + p.c;
  * landed"). When swapEndpoints form an adjacent horizontal/vertical pair, that
  * swipe direction also decides a directly-created Laser's orientation (clears
  * along the swipe, not the matched line) -- a cascade-formed Laser has no swipe
- * to reference and falls back to the line's own direction.
+ * to reference and falls back to the line's own direction. enabledSpecials, when
+ * given, restricts which kinds a level allows creating; a shape that would make a
+ * disabled kind is skipped entirely (its cells clear as a plain match instead).
  */
-export function planSpecials(runs: Run[], swapEndpoints: Pos[] = []): SpecialPlan[] {
+export function planSpecials(
+  runs: Run[],
+  swapEndpoints: Pos[] = [],
+  enabledSpecials?: Set<SpecialKind>,
+): SpecialPlan[] {
   let swipeOrientation: 'h' | 'v' | null = null;
   if (swapEndpoints.length === 2) {
     const [p0, p1] = swapEndpoints as [Pos, Pos];
@@ -106,6 +114,7 @@ export function planSpecials(runs: Run[], swapEndpoints: Pos[] = []): SpecialPla
       special = { kind: 'bomb' };
     }
     if (!special) continue;
+    if (enabledSpecials && !enabledSpecials.has(special.kind)) continue;
 
     let pos: Pos | undefined = swipeEndpoint;
     if (!pos) {
@@ -217,13 +226,30 @@ export function specialEffectCells(grid: Grid, pos: Pos, special: Special, color
 
 /**
  * Flood-fill chain resolution: starting from initialCells, repeatedly expands
- * through any special's own effect cells until nothing new is discovered.
- * Pure; does not mutate grid.
+ * through any special's own effect cells until nothing new is discovered, then
+ * propagates obstacle damage outward from every cleared cell (a frozen obstacle
+ * can't be matched or targeted directly, but takes one hit whenever a cell next
+ * to it clears -- breaking it clears it in turn and keeps the chain going into
+ * its own neighbors). Pure; does not mutate grid -- callers apply `cleared` and
+ * decrement `damaged` obstacles' hit counts themselves.
  */
 export function expandActivation(grid: Grid, initialCells: Pos[]): ActivationResult {
   const seen = new Set<number>();
   const cleared: Pos[] = [];
   const clearedCounts = new Array(TYPES).fill(0) as number[];
+  const damaged: Pos[] = [];
+
+  /** Applies one hit to an obstacle cell; returns true if it broke (now clear). */
+  const hitObstacle = (p: Pos, gem: Gem): boolean => {
+    if (gem.obstacle!.hits - 1 <= 0) {
+      cleared.push(p);
+      clearedCounts[gem.type]++;
+      return true;
+    }
+    damaged.push(p);
+    return false;
+  };
+
   const queue: Pos[] = [...initialCells];
   let head = 0;
   while (head < queue.length) {
@@ -233,13 +259,41 @@ export function expandActivation(grid: Grid, initialCells: Pos[]): ActivationRes
     seen.add(k);
     const gem = grid[p.r]?.[p.c];
     if (!gem) continue;
+    if (gem.obstacle) {
+      hitObstacle(p, gem);
+      continue; // an obstacle (broken or not) never carries a special to chain from
+    }
     cleared.push(p);
     clearedCounts[gem.type]++;
     if (gem.special) {
       for (const ec of specialEffectCells(grid, p, gem.special)) queue.push(ec);
     }
   }
-  return { cleared, clearedCounts };
+
+  const adjQueue: Pos[] = cleared.slice();
+  let adjHead = 0;
+  const R = numRows(grid);
+  const C = numCols(grid);
+  while (adjHead < adjQueue.length) {
+    const p = adjQueue[adjHead++]!;
+    const neighbors: Pos[] = [
+      { r: p.r - 1, c: p.c },
+      { r: p.r + 1, c: p.c },
+      { r: p.r, c: p.c - 1 },
+      { r: p.r, c: p.c + 1 },
+    ];
+    for (const n of neighbors) {
+      if (n.r < 0 || n.r >= R || n.c < 0 || n.c >= C) continue;
+      const nk = key(n);
+      if (seen.has(nk)) continue;
+      const gem = grid[n.r]?.[n.c];
+      if (!gem || !gem.obstacle) continue;
+      seen.add(nk);
+      if (hitObstacle(n, gem)) adjQueue.push(n);
+    }
+  }
+
+  return { cleared, clearedCounts, damaged };
 }
 
 /**

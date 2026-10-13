@@ -18,6 +18,11 @@ function withSpecial(g: Grid, p: Pos, special: Special): Grid {
   return g;
 }
 
+function withObstacle(g: Grid, p: Pos, hits: number): Grid {
+  g[p.r]![p.c] = { ...g[p.r]![p.c]!, obstacle: { kind: 'ice', hits } };
+  return g;
+}
+
 const has = (cells: Pos[], p: Pos): boolean => cells.some((c) => c.r === p.r && c.c === p.c);
 
 test('planSpecials: straight runs map to laser/hypercube/star by length', () => {
@@ -103,6 +108,15 @@ test('planSpecials: a cascade-formed Laser (no swipe to reference) falls back to
   const g = gridFrom([[0, 0, 0, 0, 1]]);
   const plans = planSpecials(findRuns(g), []);
   assert.deepEqual(plans[0]!.special, { kind: 'laser', orientation: 'h' });
+});
+
+test('planSpecials: enabledSpecials restricts which kinds a level allows', () => {
+  const g = gridFrom([[0, 0, 0, 0, 1]]);
+  const runs = findRuns(g);
+  const allowed = planSpecials(runs, [], new Set(['laser']));
+  assert.equal(allowed.length, 1);
+  const disallowed = planSpecials(runs, [], new Set(['bomb']));
+  assert.equal(disallowed.length, 0, 'laser is disabled, so the shape creates nothing');
 });
 
 test('planSpecials: two unrelated shapes in one findRuns() call yield two plans', () => {
@@ -369,4 +383,58 @@ test('upgrading a cell to special preserves its id (sprite continuity)', () => {
   const before = g[0]![0]!.id;
   const gg = withSpecial(g, { r: 0, c: 0 }, { kind: 'bomb' });
   assert.equal(gg[0]![0]!.id, before);
+});
+
+test('expandActivation: a multi-hit obstacle adjacent to a clear is damaged, not cleared', () => {
+  let g = gridFrom([[0, 0, 0, 1]]);
+  g = withObstacle(g, { r: 0, c: 3 }, 2);
+  const seed = [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }];
+  const result = expandActivation(g, seed);
+  assert.equal(result.cleared.length, 3, 'only the three matched gems clear');
+  assert.ok(has(result.damaged, { r: 0, c: 3 }), 'adjacent obstacle takes a hit');
+  assert.ok(!has(result.cleared, { r: 0, c: 3 }), 'obstacle survives at 1 hit remaining');
+});
+
+test('expandActivation: an obstacle at its last hit breaks and clears when adjacent to a clear', () => {
+  let g = gridFrom([[0, 0, 0, 1]]);
+  g = withObstacle(g, { r: 0, c: 3 }, 1);
+  const seed = [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }];
+  const result = expandActivation(g, seed);
+  assert.ok(has(result.cleared, { r: 0, c: 3 }), 'last hit breaks the obstacle');
+  assert.equal(result.clearedCounts[1], 1, 'the broken obstacle\'s own color counts once it clears');
+  assert.equal(result.damaged.length, 0);
+});
+
+test('expandActivation: a frozen cell is never matchable, only damageable by adjacency/blast', () => {
+  // The obstacle cell itself must never appear as a direct match seed in practice
+  // (findRuns already treats it as inert); this confirms expandActivation also
+  // never "matches" it directly -- only clears it via the obstacle hit path.
+  let g = gridFrom([[0, 0, 0, 1]]);
+  g = withObstacle(g, { r: 0, c: 3 }, 1);
+  const result = expandActivation(g, [{ r: 0, c: 3 }]); // hit it directly, as a special blast would
+  assert.ok(has(result.cleared, { r: 0, c: 3 }));
+  assert.equal(result.clearedCounts[1], 1);
+});
+
+test('expandActivation: a bomb blast directly reaching an obstacle damages/breaks it', () => {
+  let g = gridFrom([
+    [5, 6, 7],
+    [8, 2, 9],
+    [1, 3, 4],
+  ]);
+  g = withObstacle(g, { r: 0, c: 0 }, 1);
+  g = withSpecial(g, { r: 1, c: 1 }, { kind: 'bomb' });
+  const result = expandActivation(g, [{ r: 1, c: 1 }]);
+  assert.ok(has(result.cleared, { r: 0, c: 0 }), 'blast reaches and breaks the 1-hit obstacle');
+  assert.ok(has(result.cleared, { r: 1, c: 1 }), 'the bomb itself clears too');
+});
+
+test('expandActivation: breaking one obstacle chain-damages a neighboring obstacle', () => {
+  let g = gridFrom([[0, 0, 0, 1, 2]]);
+  g = withObstacle(g, { r: 0, c: 3 }, 1);
+  g = withObstacle(g, { r: 0, c: 4 }, 1);
+  const seed = [{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }];
+  const result = expandActivation(g, seed);
+  assert.ok(has(result.cleared, { r: 0, c: 3 }), 'first obstacle breaks from the match');
+  assert.ok(has(result.cleared, { r: 0, c: 4 }), 'second obstacle breaks from the chain, not the original match');
 });
