@@ -170,10 +170,10 @@ h1 {
   height: 38%;
   width: auto;
 }
-.frame-tl { top: 0; left: 0; transform: translate(-45%, -20%); }
-.frame-tr { top: 0; right: 0; transform: translate(45%, -20%); }
-.frame-bl { bottom: 0; left: 0; transform: translate(-45%, 20%); }
-.frame-br { bottom: 0; right: 0; transform: translate(45%, 20%); }
+.frame-tl { top: 0; left: 0; transform: translate(-20%, -8%); }
+.frame-tr { top: 0; right: 0; transform: translate(20%, -8%); }
+.frame-bl { bottom: 0; left: 0; transform: translate(-20%, 8%); }
+.frame-br { bottom: 0; right: 0; transform: translate(20%, 8%); }
 
 /* Narrow/portrait screens: pills group above the board instead of flanking it. */
 @media (max-width: 760px) {
