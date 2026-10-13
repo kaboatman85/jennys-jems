@@ -6,7 +6,6 @@ import type { Grid, Mask, Pos } from './board.ts';
 import type { GemArt, ObstacleArt, OverlayArt } from './gems.ts';
 import type { Particle } from './particles.ts';
 import type { Sprite } from './sprites.ts';
-import { FLOWER_COLORS, drawFlower, drawLeaf } from './deco.ts';
 
 /** roundRect() needs a fairly recent browser; arcTo works everywhere. */
 export function roundRectPath(
@@ -44,9 +43,10 @@ export interface FrameGeometry {
   canvasH: number;
 }
 
-/** Pre-renders the gold cherry-blossom frame, cream board, and checkered cells. */
+/** Pre-renders a plain cream board with checkered cells (no floral border --
+ * the owner's frame.png overlay handles the decorative surround). */
 export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
-  const { rows, cols, mask, cell, pad, bleed, dpr, cssW, cssH, ox, oy } = geo;
+  const { rows, cols, mask, cell, bleed, dpr, cssW, cssH, ox, oy } = geo;
   const cv = document.createElement('canvas');
   cv.width = geo.canvasW;
   cv.height = geo.canvasH;
@@ -55,35 +55,19 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
 
   const rr = (x: number, y: number, w: number, h: number, r: number): void => roundRectPath(c, x, y, w, h, r);
 
-  // Frame band.
+  // Cream board background.
   const bx = bleed;
   const by = bleed;
   const bw = cssW - 2 * bleed;
   const bh = cssH - 2 * bleed;
-  const band = c.createLinearGradient(0, by, 0, by + bh);
-  band.addColorStop(0, '#f3cf7e');
-  band.addColorStop(0.5, '#e3b65c');
-  band.addColorStop(1, '#c9943a');
-  rr(bx, by, bw, bh, cell * 0.42);
-  c.fillStyle = band;
-  c.fill();
-  c.lineWidth = Math.max(2, cell * 0.05);
-  c.strokeStyle = 'rgba(255,250,235,0.85)';
-  c.stroke();
-
-  // Cream board.
-  const ix = bx + pad * 0.45;
-  const iy = by + pad * 0.45;
-  const iw = bw - pad * 0.9;
-  const ih = bh - pad * 0.9;
-  const cream = c.createLinearGradient(0, iy, 0, iy + ih);
+  const cream = c.createLinearGradient(0, by, 0, by + bh);
   cream.addColorStop(0, '#fff6e6');
   cream.addColorStop(1, '#ffe9c4');
-  rr(ix, iy, iw, ih, cell * 0.3);
+  rr(bx, by, bw, bh, cell * 0.3);
   c.fillStyle = cream;
   c.fill();
   c.lineWidth = Math.max(1.5, cell * 0.03);
-  c.strokeStyle = 'rgba(201,148,58,0.65)';
+  c.strokeStyle = 'rgba(201,148,58,0.45)';
   c.stroke();
 
   // Checkered cells (skipped for masked-out cells -- the cream board shows through).
@@ -97,37 +81,6 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
     }
   }
 
-  // Cherry blossoms + leaves around the frame.
-  const leaf = '#9bc9a0';
-  const midY = by + pad * 0.25;
-  const rBand = Math.max(pad * 0.62, 9);
-  const edge = (x: number, y: number, angle: number, ci: number): void => {
-    drawLeaf(c, x, y, rBand * 2.1, angle - 0.5, leaf);
-    drawLeaf(c, x, y, rBand * 2.1, angle + 0.5, leaf);
-    const [petal, center] = FLOWER_COLORS[ci % FLOWER_COLORS.length]!;
-    drawFlower(c, x, y, rBand, petal, center, 5, ci);
-  };
-  for (let i = 1; i < cols; i += 2) {
-    const x = ox + i * cell + cell * 0.5 * (i % 2 ? 1 : 0);
-    edge(x, midY + pad * 0.1, -Math.PI / 2, i);
-    edge(x, by + bh - pad * 0.35, Math.PI / 2, i + 1);
-  }
-  for (let i = 1; i < rows; i += 2) {
-    const y = oy + i * cell;
-    edge(bx + pad * 0.3, y, Math.PI, i + 2);
-    edge(bx + bw - pad * 0.3, y, 0, i + 3);
-  }
-  const corner = (x: number, y: number, a: number, ci: number): void => {
-    drawLeaf(c, x, y, cell * 0.55, a - 0.6, leaf);
-    drawLeaf(c, x, y, cell * 0.55, a + 0.6, '#aed9b2');
-    const [petal, center] = FLOWER_COLORS[ci % FLOWER_COLORS.length]!;
-    drawFlower(c, x, y, cell * 0.38, petal, center, 5, a);
-  };
-  const o = cell * 0.24;
-  corner(bx + o, by + o, (-3 * Math.PI) / 4, 0);
-  corner(bx + bw - o, by + o, -Math.PI / 4, 1);
-  corner(bx + o, by + bh - o, (3 * Math.PI) / 4, 2);
-  corner(bx + bw - o, by + bh - o, Math.PI / 4, 3);
   return cv;
 }
 
