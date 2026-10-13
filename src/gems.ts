@@ -27,6 +27,7 @@ export const GEM_DEFS: GemDef[] = [
   { name: 'Citrine', base: '#ffc414', sides: 4, rot: -Math.PI / 2, n: 2, sx: 0.84, sy: 1 },
   { name: 'Amethyst', base: '#a74dff', sides: 3, rot: -Math.PI / 2, n: 2, sx: 1, sy: 1 },
   { name: 'Rose Quartz', base: '#ff7ab8', sides: 16, rot: 0, n: 4, sx: 1, sy: 1 },
+  { name: 'Topaz', base: '#ff8c1a', sides: 5, rot: -Math.PI / 2, n: 2, sx: 1, sy: 1 },
 ];
 
 const WHITE: RGB = [255, 255, 255];
