@@ -25,7 +25,7 @@ import type { MoveItem, Sprite } from './sprites.ts';
 import { ParticleSystem } from './particles.ts';
 import { BoardInput } from './board-input.ts';
 import type { BoardGeometry } from './board-input.ts';
-import { buildFrame, draw, loadFrameOverlay } from './board-render.ts';
+import { buildFrame, draw } from './board-render.ts';
 import { applyClear, applyDropItems, applyObstaclesCleared, applyScore, checkOutcome, createLevelState, recordMove } from './level.ts';
 import type { LevelConfig, LevelState, Objective } from './level.ts';
 
@@ -122,7 +122,6 @@ export class Game {
       },
     );
     this.hooks.onScore(this.score, this.best);
-    loadFrameOverlay(() => { /* redraws on next rAF automatically */ });
     requestAnimationFrame(this.loop);
   }
 

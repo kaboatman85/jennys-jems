@@ -7,18 +7,6 @@ import type { GemArt, ObstacleArt, OverlayArt } from './gems.ts';
 import type { Particle } from './particles.ts';
 import type { Sprite } from './sprites.ts';
 
-let frameImg: HTMLImageElement | null = null;
-let frameReady = false;
-let frameOnReady: (() => void) | null = null;
-
-export function loadFrameOverlay(onReady: () => void): void {
-  if (frameReady) return;
-  if (frameImg) { frameOnReady = onReady; return; }
-  frameImg = new Image();
-  frameOnReady = onReady;
-  frameImg.onload = () => { frameReady = true; frameOnReady?.(); };
-  frameImg.src = './frame.png';
-}
 
 /** roundRect() needs a fairly recent browser; arcTo works everywhere. */
 export function roundRectPath(
@@ -176,8 +164,4 @@ export function draw(now: number, s: DrawState): void {
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-
-  if (frameReady && frameImg) {
-    ctx.drawImage(frameImg, 0, 0, s.cssW, s.cssH);
-  }
 }

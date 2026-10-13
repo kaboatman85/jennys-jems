@@ -152,11 +152,28 @@ h1 {
   min-height: 0;
 }
 
+.board-frame-wrap {
+  position: relative;
+  display: inline-block;
+}
+
 #board {
   display: block;
   touch-action: none;
   filter: drop-shadow(0 10px 16px rgba(120, 80, 30, 0.3));
 }
+
+.frame-corner {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+  height: 55%;
+  width: auto;
+}
+.frame-tl { top: -4%; left: -6%; }
+.frame-tr { top: -4%; right: -10%; }
+.frame-bl { bottom: -2%; left: -6%; }
+.frame-br { bottom: -2%; right: -6%; }
 
 /* Narrow/portrait screens: pills group above the board instead of flanking it. */
 @media (max-width: 760px) {

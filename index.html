@@ -35,7 +35,13 @@
         </div>
         <div class="board-wrap">
           <div id="objectives-bar" class="hidden"></div>
-          <canvas id="board" aria-label="게임 보드"></canvas>
+          <div class="board-frame-wrap">
+            <canvas id="board" aria-label="게임 보드"></canvas>
+            <img class="frame-corner frame-tl" src="frame-tl.png" alt="" />
+            <img class="frame-corner frame-tr" src="frame-tr.png" alt="" />
+            <img class="frame-corner frame-bl" src="frame-bl.png" alt="" />
+            <img class="frame-corner frame-br" src="frame-br.png" alt="" />
+          </div>
           <div id="toast" aria-live="polite"></div>
         </div>
         <div class="pill" id="pill-best">
