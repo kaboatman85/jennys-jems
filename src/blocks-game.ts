@@ -231,7 +231,7 @@ export class BlockGame {
     this.cssH = availH;
     this.dpr = Math.min(window.devicePixelRatio || 1, 3);
     // Vertical budget in cells: board (8 + padding) + gap + tray.
-    this.cell = Math.max(20, Math.floor(Math.min(availW / (BLOCK_SIZE + 0.7), availH / 12.2)));
+    this.cell = Math.max(20, Math.floor(Math.min(availW / (BLOCK_SIZE + 0.7), availH / (BLOCK_SIZE + 4.2))));
     this.pad = Math.round(this.cell * 0.25);
     this.bw = BLOCK_SIZE * this.cell + 2 * this.pad;
     this.bh = this.bw;

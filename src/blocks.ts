@@ -1,11 +1,11 @@
-// Pure engine for the block-fitting puzzle: an 8x8 grid, a tray of three pieces,
+// Pure engine for the block-fitting puzzle: a 7x7 grid, a tray of three pieces,
 // full rows/columns clear. No DOM, no rendering. Difficulty is a "stage" derived
 // from score; higher stages unlock bigger/awkward shapes and stop guaranteeing
 // that the tray has a playable piece.
 
 import type { Pos, Rng } from './board.ts';
 
-export const BLOCK_SIZE = 8;
+export const BLOCK_SIZE = 7;
 export const TRAY_SIZE = 3;
 export const MAX_STAGE = 10;
 export const COLOR_COUNT = 7;
@@ -16,7 +16,7 @@ export type ShapeCells = ReadonlyArray<readonly [number, number]>;
 export interface Shape {
   id: string;
   cells: ShapeCells;
-  tier: 1 | 2 | 3;
+  tier: 1 | 2 | 3 | 4;
   w: number;
   h: number;
 }
@@ -29,7 +29,7 @@ export interface Piece {
 /** null = empty, otherwise the color index of the block sitting there. */
 export type BlockGrid = (number | null)[][];
 
-function shape(id: string, tier: 1 | 2 | 3, ...rows: string[]): Shape {
+function shape(id: string, tier: 1 | 2 | 3 | 4, ...rows: string[]): Shape {
   const cells: Array<readonly [number, number]> = [];
   rows.forEach((row, r) => {
     [...row].forEach((ch, c) => {
@@ -80,6 +80,21 @@ export const SHAPES: Shape[] = [
   shape('s-v', 3, '#.', '##', '.#'),
   shape('z-v', 3, '.#', '##', '#.'),
   shape('sq3', 3, '###', '###', '###'),
+  shape('plus', 3, '.#.', '###', '.#.'),
+  shape('u-a', 3, '#.#', '###'),
+  shape('u-b', 3, '###', '#.#'),
+  shape('u-c', 3, '##', '#.', '##'),
+  shape('u-d', 3, '##', '.#', '##'),
+  shape('r24', 3, '####', '####'),
+  shape('r42', 3, '##', '##', '##', '##'),
+
+  // Tier 4: jumbo pieces that take up a big share of a 7x7 board.
+  shape('r34', 4, '####', '####', '####'),
+  shape('r43', 4, '###', '###', '###', '###'),
+  shape('l7-a', 4, '####', '#...', '#...', '#...'),
+  shape('l7-b', 4, '####', '...#', '...#', '...#'),
+  shape('l7-c', 4, '#...', '#...', '#...', '####'),
+  shape('l7-d', 4, '...#', '...#', '...#', '####'),
 ];
 
 export function createBlockGrid(): BlockGrid {
@@ -171,23 +186,27 @@ export function applyMove(grid: BlockGrid, piece: Piece, r: number, c: number, p
   };
 }
 
-/** Stage climbs quickly at first and slows down: 40 pts -> 1, 160 -> 2, 360 -> 3 ... capped at MAX_STAGE. */
+/** Stage climbs quickly at first and slows down: 25 pts -> 1, 100 -> 2, 225 -> 3 ... capped at MAX_STAGE. */
 export function stageFor(score: number): number {
-  return Math.min(MAX_STAGE, Math.floor(Math.sqrt(Math.max(0, score) / 40)));
+  return Math.min(MAX_STAGE, Math.floor(Math.sqrt(Math.max(0, score) / 25)));
 }
 
-/** Share of the tray draw that each tier gets at a given stage. Tier 1 never fully disappears. */
-export function tierShares(stage: number): Record<1 | 2 | 3, number> {
+type Tier = 1 | 2 | 3 | 4;
+
+/** Share of the tray draw that each tier gets at a given stage. Medium and large
+ * pieces are in the mix from the very first stage; jumbo pieces join at stage 1. */
+export function tierShares(stage: number): Record<Tier, number> {
   return {
-    1: Math.max(0.15, 1 - 0.1 * stage),
-    2: stage >= 1 ? Math.min(1, 0.35 * stage) : 0,
-    3: stage >= 3 ? Math.min(1, 0.3 * (stage - 2)) : 0,
+    1: Math.max(0.08, 0.6 - 0.08 * stage),
+    2: Math.min(1, 0.7 + 0.06 * stage),
+    3: Math.min(1, 0.15 + 0.12 * stage),
+    4: stage >= 1 ? Math.min(0.8, 0.1 * stage) : 0,
   };
 }
 
 function pickShape(rng: Rng, stage: number): Shape {
   const shares = tierShares(stage);
-  const count: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 };
+  const count: Record<Tier, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const s of SHAPES) count[s.tier]++;
   const weights = SHAPES.map((s) => shares[s.tier] / count[s.tier]);
   const total = weights.reduce((a, b) => a + b, 0);
@@ -204,7 +223,7 @@ export function randomPiece(rng: Rng, stage: number): Piece {
 }
 
 /** Stages below this always deal a tray with at least one piece that can be placed. */
-export const FAIR_TRAY_BELOW_STAGE = 6;
+export const FAIR_TRAY_BELOW_STAGE = 4;
 
 export function nextTray(grid: BlockGrid, rng: Rng, stage: number): Piece[] {
   let tray: Piece[] = [];

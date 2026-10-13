@@ -199,14 +199,17 @@ Logic lives in `specials.ts` (`planSpecials`, `expandActivation`, `comboActivati
 
 A Block Blast / 1010!-style game that lives inside the app as its own screen (`#screen-blocks`), opened
 from the "블록 Blocks" button next to Endless on the level-select screen. Drag one of three pieces from the
-tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no tray piece fits anywhere.
+tray onto a 7x7 grid; full rows/columns clear. No rotation. Game over when no tray piece fits anywhere.
 
-- **Engine (`blocks.ts`, pure, 14 tests in `tests/blocks.test.ts`):** 29 shapes in 3 tiers. Difficulty is a
-  *stage* derived from score (`stageFor`: sqrt(score/40), capped at 10, shown 1-based in the HUD).
-  `tierShares(stage)` controls the draw mix: stage 0 = starter shapes only (dot, 2-3 bars, 2x2), tier 2
-  (4-bars, small L, 2x3) from stage 1, tier 3 (5-bars, big L, T, S/Z, 3x3) from stage 3. Below
-  `FAIR_TRAY_BELOW_STAGE` (6) a tray always contains a placeable piece (`nextTray`, with a forced-fit
-  fallback); from stage 6 up it doesn't, which is the difficulty.
+- **Engine (`blocks.ts`, pure, tests in `tests/blocks.test.ts`):** 42 shapes in 4 tiers (starter bars/2x2;
+  4-bars, small L, 2x3; 5-bars, big L, T, S/Z, 3x3, plus, U, 2x4; jumbo 3x4/4x3 blocks and 4-arm corners).
+  Difficulty is a *stage* derived from score (`stageFor`: sqrt(score/25), capped at 10, shown 1-based in the
+  HUD). `tierShares(stage)` controls the draw mix: medium and large pieces are in the mix from the very
+  first stage, jumbo pieces from stage 1 (HUD stage 2), and starter pieces thin out over time. Below
+  `FAIR_TRAY_BELOW_STAGE` (4) a tray always contains a placeable piece (`nextTray`, with a forced-fit
+  fallback); from stage 4 up it doesn't, which is the difficulty. Tune difficulty in `tierShares`; a greedy
+  bot (clear-seeking, one-ply) lasts a median ~14 moves on the current mix vs ~32 on the original 8x8
+  easy-start version, so a more-than-2x jump -- ease it back there if play-testing says it's too harsh.
 - **Scoring:** 1 per block placed, 10 x lines^2 per clear, +20 per extra move in a clearing streak.
 - **Front-end (`blocks-game.ts`):** one canvas holds board + tray. Held piece floats ~0.9 cell above the
   finger and snaps to the nearest grid position; a translucent ghost shows where it lands and rows/columns

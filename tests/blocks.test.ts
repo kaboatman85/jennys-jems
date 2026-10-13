@@ -104,7 +104,7 @@ test('applyMove: a move that clears nothing resets the streak and leaves the pie
 
 test('findFullLines ignores partial lines', () => {
   const grid = createBlockGrid();
-  fillRow(grid, 2, [7]);
+  fillRow(grid, 2, [BLOCK_SIZE - 1]);
   assert.deepEqual(findFullLines(grid), { rows: [], cols: [] });
 });
 
@@ -117,9 +117,9 @@ test('scoreMove: streaks add a flat bonus', () => {
 
 test('stageFor: monotonic, starts at 0, capped', () => {
   assert.equal(stageFor(0), 0);
-  assert.equal(stageFor(39), 0);
-  assert.equal(stageFor(40), 1);
-  assert.equal(stageFor(160), 2);
+  assert.equal(stageFor(24), 0);
+  assert.equal(stageFor(25), 1);
+  assert.equal(stageFor(100), 2);
   assert.equal(stageFor(10_000_000), MAX_STAGE);
   let prev = 0;
   for (let s = 0; s < 6000; s += 25) {
@@ -129,19 +129,48 @@ test('stageFor: monotonic, starts at 0, capped', () => {
   }
 });
 
-test('tierShares: only tier 1 at stage 0, tiers unlock in order, tier 1 never vanishes', () => {
-  assert.deepEqual(tierShares(0), { 1: 1, 2: 0, 3: 0 });
-  assert.ok(tierShares(1)[2] > 0 && tierShares(1)[3] === 0);
-  assert.ok(tierShares(3)[3] > 0);
-  assert.ok(tierShares(MAX_STAGE)[1] >= 0.15);
+test('tierShares: medium and large pieces are in the mix from stage 0, jumbo joins at stage 1', () => {
+  const t0 = tierShares(0);
+  assert.ok(t0[2] > 0 && t0[3] > 0);
+  assert.equal(t0[4], 0);
+  assert.ok(tierShares(1)[4] > 0);
+  assert.ok(tierShares(MAX_STAGE)[1] >= 0.08, 'tier 1 never fully disappears');
+  assert.ok(tierShares(MAX_STAGE)[1] < tierShares(0)[1], 'starter pieces thin out over time');
 });
 
-test('nextTray: stage 0 deals only starter shapes', () => {
+test('every shape fits somewhere on an empty board', () => {
+  const grid = createBlockGrid();
+  for (const s of SHAPES) assert.equal(canPlaceAnywhere(grid, s), true, s.id);
+});
+
+test('tier 4 pieces are genuinely large', () => {
+  const jumbo = SHAPES.filter((s) => s.tier === 4);
+  assert.ok(jumbo.length >= 4);
+  for (const s of jumbo) assert.ok(s.cells.length >= 7, s.id);
+  assert.ok(Math.max(...SHAPES.map((s) => s.cells.length)) >= 12);
+});
+
+test('nextTray: stage 0 never deals jumbo pieces but does deal medium and large ones', () => {
   const rng = mulberry32(7);
   const grid = createBlockGrid();
-  for (let i = 0; i < 200; i++) {
-    for (const p of nextTray(grid, rng, 0)) assert.equal(p.shape.tier, 1);
+  const seen = new Set<number>();
+  for (let i = 0; i < 300; i++) {
+    for (const p of nextTray(grid, rng, 0)) {
+      assert.notEqual(p.shape.tier, 4);
+      seen.add(p.shape.tier);
+    }
   }
+  assert.ok(seen.has(1) && seen.has(2) && seen.has(3));
+});
+
+test('nextTray: stage 1 starts dealing jumbo pieces', () => {
+  const rng = mulberry32(5);
+  const grid = createBlockGrid();
+  let sawJumbo = false;
+  for (let i = 0; i < 300 && !sawJumbo; i++) {
+    sawJumbo = nextTray(grid, rng, 1).some((p) => p.shape.tier === 4);
+  }
+  assert.ok(sawJumbo);
 });
 
 test('nextTray: higher stages eventually deal tier 3 shapes', () => {
