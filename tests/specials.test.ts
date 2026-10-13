@@ -62,6 +62,49 @@ test('planSpecials: an L/T/+ cross of runs becomes one Bomb, not two plans', () 
   assert.deepEqual(plans[0]!.special, { kind: 'bomb' });
 });
 
+test('planSpecials: a lone 2x2 block becomes a Bomb', () => {
+  const g = gridFrom([
+    [0, 0, 1],
+    [0, 0, 2],
+    [3, 4, 5],
+  ]);
+  const runs = findRuns(g);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0]!.dir, 'sq');
+  const plans = planSpecials(runs);
+  assert.equal(plans.length, 1);
+  assert.deepEqual(plans[0]!.special, { kind: 'bomb' });
+});
+
+test("planSpecials: a directly-created Laser's orientation follows the swipe, not the match's own line", () => {
+  // The match itself is a horizontal 4-run (row 1), but the player's swap endpoints
+  // are vertically aligned (col 2, rows 0-1) -- with only 2 rows, no vertical run is
+  // even possible, so this is unambiguously just the one horizontal match. The swipe
+  // was vertical, so the Laser should clear vertically despite the matched line
+  // running horizontally.
+  const g = gridFrom([
+    [6, 7, 5, 8, 9],
+    [0, 0, 0, 0, 1],
+  ]);
+  const runs = findRuns(g);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0]!.dir, 'h');
+
+  const plans = planSpecials(runs, [
+    { r: 0, c: 2 },
+    { r: 1, c: 2 },
+  ]);
+  assert.equal(plans.length, 1);
+  assert.deepEqual(plans[0]!.special, { kind: 'laser', orientation: 'v' });
+  assert.deepEqual(plans[0]!.pos, { r: 1, c: 2 });
+});
+
+test('planSpecials: a cascade-formed Laser (no swipe to reference) falls back to the matched line direction', () => {
+  const g = gridFrom([[0, 0, 0, 0, 1]]);
+  const plans = planSpecials(findRuns(g), []);
+  assert.deepEqual(plans[0]!.special, { kind: 'laser', orientation: 'h' });
+});
+
 test('planSpecials: two unrelated shapes in one findRuns() call yield two plans', () => {
   const g = gridFrom([
     [0, 0, 0, 0, 9, 9, 9, 9, 9],

@@ -20,12 +20,23 @@ const key = (p: Pos): number => p.r * 1000 + p.c;
 
 /**
  * Groups one findRuns() call's runs into connected shapes (runs sharing a cell
- * form an L/T/+ cross) and decides which shapes become which special.
- * swapEndpoints (the player's swap positions, first cascade step only) decide
- * spawn position when a shape contains one of them; otherwise a deterministic
- * in-shape cell is used (cascade-born specials have no "where it landed").
+ * form an L/T/+ cross, or come from a 2x2 block) and decides which shapes become
+ * which special. swapEndpoints (the player's swap positions, first cascade step
+ * only) decide spawn position when a shape contains one of them; otherwise a
+ * deterministic in-shape cell is used (cascade-born specials have no "where it
+ * landed"). When swapEndpoints form an adjacent horizontal/vertical pair, that
+ * swipe direction also decides a directly-created Laser's orientation (clears
+ * along the swipe, not the matched line) -- a cascade-formed Laser has no swipe
+ * to reference and falls back to the line's own direction.
  */
 export function planSpecials(runs: Run[], swapEndpoints: Pos[] = []): SpecialPlan[] {
+  let swipeOrientation: 'h' | 'v' | null = null;
+  if (swapEndpoints.length === 2) {
+    const [p0, p1] = swapEndpoints as [Pos, Pos];
+    if (p0.r === p1.r && p0.c !== p1.c) swipeOrientation = 'h';
+    else if (p0.c === p1.c && p0.r !== p1.r) swipeOrientation = 'v';
+  }
+
   const n = runs.length;
   const parent = Array.from({ length: n }, (_, i) => i);
   const find = (i: number): number => {
@@ -63,27 +74,40 @@ export function planSpecials(runs: Run[], swapEndpoints: Pos[] = []): SpecialPla
   for (const idxs of groups.values()) {
     const groupRuns = idxs.map((i) => runs[i]!);
 
+    const cellMap = new Map<number, Pos>();
+    for (const run of groupRuns) for (const p of run.cells) cellMap.set(key(p), p);
+
+    let swipeEndpoint: Pos | undefined;
+    for (const ep of swapEndpoints) {
+      if (cellMap.has(key(ep))) {
+        swipeEndpoint = ep;
+        break;
+      }
+    }
+
     let special: Special | null = null;
     if (groupRuns.length === 1) {
-      const len = groupRuns[0]!.cells.length;
-      if (len === 4) special = { kind: 'laser', orientation: groupRuns[0]!.dir };
-      else if (len === 5) special = { kind: 'hypercube' };
-      else if (len >= 6) special = { kind: 'star' };
+      const run = groupRuns[0]!;
+      const dir = run.dir;
+      if (dir === 'sq') {
+        special = { kind: 'bomb' };
+      } else {
+        const len = run.cells.length;
+        if (len === 4) {
+          const orientation = swipeEndpoint && swipeOrientation ? swipeOrientation : dir;
+          special = { kind: 'laser', orientation };
+        } else if (len === 5) {
+          special = { kind: 'hypercube' };
+        } else if (len >= 6) {
+          special = { kind: 'star' };
+        }
+      }
     } else {
       special = { kind: 'bomb' };
     }
     if (!special) continue;
 
-    const cellMap = new Map<number, Pos>();
-    for (const run of groupRuns) for (const p of run.cells) cellMap.set(key(p), p);
-
-    let pos: Pos | undefined;
-    for (const ep of swapEndpoints) {
-      if (cellMap.has(key(ep))) {
-        pos = ep;
-        break;
-      }
-    }
+    let pos: Pos | undefined = swipeEndpoint;
     if (!pos) {
       if (groupRuns.length === 1) {
         const cells = groupRuns[0]!.cells;

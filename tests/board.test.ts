@@ -49,6 +49,46 @@ test('findRuns: horizontal, vertical, and length-5 runs', () => {
   assert.ok(v.some((r) => r.type === 3 && r.cells.length === 3));
 });
 
+test('findRuns: a 2x2 block is a match too, reported with dir "sq"', () => {
+  const g = gridFrom([
+    [0, 0, 1],
+    [0, 0, 2],
+    [3, 4, 5],
+  ]);
+  const runs = findRuns(g);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0]!.dir, 'sq');
+  assert.equal(runs[0]!.type, 0);
+  assert.equal(runs[0]!.cells.length, 4);
+});
+
+test('wouldMatch / findMoves recognize a swap that creates only a 2x2 block', () => {
+  // Swapping (0,1) and (1,1) turns rows1-2/cols1-2 into a clean 2x2 block of 0s,
+  // with no 3-in-a-line anywhere -- this must still count as a legal move.
+  const g = gridFrom([
+    [9, 0, 9],
+    [9, 1, 0],
+    [9, 0, 0],
+  ]);
+  assert.ok(wouldMatch(g, { r: 0, c: 1 }, { r: 1, c: 1 }));
+  const moves = findMoves(g);
+  assert.ok(
+    moves.some(
+      (m) =>
+        (m.a.r === 0 && m.a.c === 1 && m.b.r === 1 && m.b.c === 1) ||
+        (m.a.r === 1 && m.a.c === 1 && m.b.r === 0 && m.b.c === 1),
+    ),
+  );
+});
+
+test('createGrid: never starts with a 2x2 block either, across many seeds', () => {
+  for (let seed = 1; seed <= 300; seed++) {
+    const g = createGrid(ROWS, COLS, TYPES, mulberry32(seed));
+    const squares = findRuns(g).filter((r) => r.dir === 'sq');
+    assert.equal(squares.length, 0, `seed ${seed} starts with a 2x2 block`);
+  }
+});
+
 test('cellsOfRuns de-duplicates crossing runs (L / T shapes)', () => {
   const g = gridFrom([
     [1, 0, 2, 3],

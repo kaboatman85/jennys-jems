@@ -24,7 +24,8 @@ export interface Pos {
 export interface Run {
   cells: Pos[];
   type: number;
-  dir: 'h' | 'v';
+  /** 'sq' is a 2x2 block match (no line direction). */
+  dir: 'h' | 'v' | 'sq';
 }
 export interface Move {
   a: Pos;
@@ -66,6 +67,12 @@ export function createGrid(nRows: number, nCols: number, nTypes: number, rng: Rn
         const banned = new Set<number>();
         if (c >= 2 && row[c - 1]!.type === row[c - 2]!.type) banned.add(row[c - 1]!.type);
         if (r >= 2 && g[r - 1]![c]!.type === g[r - 2]![c]!.type) banned.add(g[r - 1]![c]!.type);
+        if (r >= 1 && c >= 1) {
+          const left = row[c - 1]!;
+          const up = g[r - 1]![c]!;
+          const upLeft = g[r - 1]![c - 1]!;
+          if (left.type === up.type && left.type === upLeft.type) banned.add(left.type);
+        }
         const allowed: number[] = [];
         for (let t = 0; t < nTypes; t++) if (!banned.has(t)) allowed.push(t);
         row.push(newGem(allowed[Math.floor(rng() * allowed.length)]!));
@@ -120,6 +127,31 @@ export function findRuns(g: Grid): Run[] {
       r = e;
     }
   }
+
+  // 2x2 blocks also count as a match (these become Bombs). Overlapping blocks (e.g.
+  // inside a larger same-type patch) are reported individually; cellsOfRuns/planSpecials
+  // dedupe and merge them the same way crossing line-runs already do.
+  for (let r = 0; r < R - 1; r++) {
+    for (let c = 0; c < C - 1; c++) {
+      const a = g[r]![c];
+      const b = g[r]![c + 1];
+      const d = g[r + 1]![c];
+      const e = g[r + 1]![c + 1];
+      if (a && b && d && e && b.type === a.type && d.type === a.type && e.type === a.type) {
+        runs.push({
+          cells: [
+            { r, c },
+            { r, c: c + 1 },
+            { r: r + 1, c },
+            { r: r + 1, c: c + 1 },
+          ],
+          type: a.type,
+          dir: 'sq',
+        });
+      }
+    }
+  }
+
   return runs;
 }
 
