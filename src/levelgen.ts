@@ -94,8 +94,16 @@ function obstaclesFor(
   rng: Rng,
 ): { pos: Pos; kind: ObstacleKind; hits: number }[] {
   const d = difficultyIndex(level);
-  const count = Math.min(6, 2 + Math.floor(d / 20));
-  const hits = level < 70 ? 1 : level < 95 ? 2 : 3;
+  // Ramps faster at low d (the solo clearTiles band, 31-45, was clearing its 3-4
+  // obstacles in a handful of moves) but still saturates at the same cap of 6 by
+  // d ~= 45, so the already-tuned clearTiles+score combo band (81-100, which was
+  // already hitting this cap) is unaffected.
+  const count = Math.min(6, 3 + Math.floor(d / 15));
+  // The solo clearTiles band (31-45) is the only place level<95 is ever reached
+  // here (46-80 don't use clearTiles at all), so bumping it to 2 hits only
+  // affects that band -- it was clearing its obstacles in a handful of moves at
+  // 1 hit each.
+  const hits = level < 95 ? 2 : 3;
   const kind: ObstacleKind = level % 2 === 0 ? 'ice' : 'dirt';
   return shuffledCells(rows, cols, mask, rng)
     .slice(0, count)
@@ -139,6 +147,24 @@ function objectiveKindsFor(level: number): Objective['kind'][] {
   return ['clearTiles', 'score'];
 }
 
+/** Early levels were clearing their score/color targets in just a handful of
+ * moves (as little as 5% of the move budget, confirmed via tools/solve-levels.ts
+ * -- a 4-6 color board produces big, frequent cascades, so a small target falls
+ * in 2-3 lucky swaps). These boosts scale targets up hardest at low difficulty
+ * and taper back toward 1x by the midgame, so the already-tuned late bands
+ * (which were using a healthy 50-90% of their move budget) aren't pushed into
+ * "too hard" by the same change that fixes the early game. */
+function scoreBoost(d: number): number {
+  // Two terms: a steep one that only matters for the first ~10 levels (those
+  // were finishing in 2-3 lucky moves even after the first attempt at this fix)
+  // plus a gentler one that tapers out by the late game, preserving the already
+  // well-tuned 80-100 band.
+  return 1 + 16 * Math.exp(-d / 8) + 3 * Math.exp(-d / 45);
+}
+function colorBoost(d: number): number {
+  return 1 + 2 * Math.exp(-d / 35);
+}
+
 function buildObjectives(
   kinds: Objective['kind'][],
   d: number,
@@ -149,8 +175,8 @@ function buildObjectives(
   dropItemCount: number,
   rng: Rng,
 ): Objective[] {
-  const scoreTarget = Math.round(180 + d * 14 + rows * cols * 0.9);
-  const colorTarget = Math.round(8 + d * 0.22);
+  const scoreTarget = Math.round((180 + d * 14 + rows * cols * 0.9) * scoreBoost(d));
+  const colorTarget = Math.round((8 + d * 0.22) * colorBoost(d));
   const color = Math.floor(rng() * nTypes);
   const combo = kinds.length > 1;
   return kinds.map((kind): Objective => {

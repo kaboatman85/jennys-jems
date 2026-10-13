@@ -188,35 +188,51 @@ function main(): void {
   console.log('lvl  rows cols types moves obj'.padEnd(40) + strategies.map((s) => s.padStart(10)).join(''));
 
   const bandSummary: Record<string, { sum: number; n: number }> = {};
+  const bandMoveFrac: Record<string, { sum: number; n: number }> = {};
 
   for (const level of allLevelIds()) {
     const config = generateLevel(level);
     const rates: number[] = [];
+    const moveFracs: number[] = [];
     for (const strategy of strategies) {
       let wins = 0;
+      let moveFracSum = 0;
+      let moveFracN = 0;
       for (let i = 0; i < runsPerLevel; i++) {
-        const { won } = simulateOnce(config, strategy, i * 7919 + 1);
-        if (won) wins++;
+        const { won, movesUsed } = simulateOnce(config, strategy, i * 7919 + 1);
+        if (won) {
+          wins++;
+          moveFracSum += movesUsed / config.moveLimit;
+          moveFracN++;
+        }
       }
       const rate = wins / runsPerLevel;
       rates.push(rate);
+      moveFracs.push(moveFracN > 0 ? moveFracSum / moveFracN : 0);
       const band = `${Math.floor((level - 1) / 10) * 10 + 1}-${Math.floor((level - 1) / 10) * 10 + 10}`;
       const bkey = `${band}:${strategy}`;
       bandSummary[bkey] ??= { sum: 0, n: 0 };
       bandSummary[bkey]!.sum += rate;
       bandSummary[bkey]!.n += 1;
+      if (moveFracN > 0) {
+        bandMoveFrac[bkey] ??= { sum: 0, n: 0 };
+        bandMoveFrac[bkey]!.sum += moveFracSum / moveFracN;
+        bandMoveFrac[bkey]!.n += 1;
+      }
     }
     const objDesc = config.objectives.map((o) => o.kind).join('+');
     const line =
       `${String(level).padStart(3)}  ${String(config.rows).padStart(4)} ${String(config.cols).padStart(4)} ` +
       `${String(config.nTypes).padStart(5)} ${String(config.moveLimit).padStart(5)} ${objDesc}`.padEnd(40) +
-      rates.map((r) => `${Math.round(r * 100)}%`.padStart(10)).join('');
+      rates.map((r, i) => `${Math.round(r * 100)}%`.padStart(10) + ` (${Math.round(moveFracs[i]! * 100)}%mv)`).join('');
     console.log(line);
   }
 
-  console.log('\nBand win-rate averages:');
+  console.log('\nBand win-rate averages (and avg % of move limit used on wins):');
   for (const [bkey, { sum, n }] of Object.entries(bandSummary)) {
-    console.log(`  ${bkey}: ${Math.round((sum / n) * 100)}%`);
+    const mv = bandMoveFrac[bkey];
+    const mvStr = mv ? `, ${Math.round((mv.sum / mv.n) * 100)}%mv` : '';
+    console.log(`  ${bkey}: ${Math.round((sum / n) * 100)}%${mvStr}`);
   }
 }
 
