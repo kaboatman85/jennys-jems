@@ -1,8 +1,11 @@
 :root {
-  --plum: #4a1d6b;
-  --pink: #ff5fa8;
-  --pink-dark: #c2307f;
+  --ink: #7a4a3a;
+  --pink: #ff6f91;
+  --pink-dark: #d1487a;
+  --gold: #c9943a;
   --cream: #fff6e8;
+  --lavender: #9b6bc0;
+  --lavender-dark: #7c5fa0;
 }
 
 * {
@@ -17,7 +20,7 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   background: #ffd3ea;
-  color: var(--plum);
+  color: var(--ink);
   font-family: 'Baloo 2', 'Marker Felt', 'Chalkboard SE', 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
   -webkit-user-select: none;
   user-select: none;
@@ -58,6 +61,19 @@ h1 {
   text-shadow: 0 4px 0 var(--pink-dark), 0 8px 14px rgba(120, 20, 90, 0.35);
 }
 
+.subtitle {
+  margin: 2px 0 0;
+  font-size: clamp(13px, 3vw, 18px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--pink-dark);
+}
+
+.subtitle .deco {
+  opacity: 0.6;
+  margin: 0 6px;
+}
+
 .hud {
   display: flex;
   gap: 10px;
@@ -66,14 +82,38 @@ h1 {
 }
 
 .pill {
-  background: rgba(255, 255, 255, 0.9);
-  border: 3px solid #ff9ccf;
-  border-radius: 999px;
-  padding: 3px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  background: rgba(255, 246, 232, 0.92);
+  border: 3px solid var(--gold);
+  border-radius: 22px;
+  padding: 4px 18px 6px;
+  box-shadow: 0 3px 0 rgba(201, 148, 58, 0.45);
+}
+
+.pill .kr {
   font-weight: 800;
-  font-size: clamp(15px, 3.8vw, 22px);
-  color: var(--plum);
-  box-shadow: 0 3px 0 rgba(194, 48, 127, 0.35);
+  font-size: clamp(14px, 3.4vw, 19px);
+  color: var(--ink);
+  line-height: 1.15;
+}
+
+.pill .en {
+  font-size: clamp(9px, 2vw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.pill .val {
+  font-weight: 800;
+  font-size: clamp(16px, 4vw, 22px);
+  color: var(--pink-dark);
+  line-height: 1.2;
 }
 
 #stage {
@@ -87,7 +127,7 @@ h1 {
 #board {
   display: block;
   touch-action: none;
-  filter: drop-shadow(0 10px 16px rgba(90, 20, 90, 0.35));
+  filter: drop-shadow(0 10px 16px rgba(120, 80, 30, 0.3));
 }
 
 footer {
@@ -116,9 +156,18 @@ footer {
   box-shadow: 0 1px 0 var(--pink-dark);
 }
 
+.btn.sound {
+  background: linear-gradient(#caa6e0, var(--lavender));
+  box-shadow: 0 4px 0 var(--lavender-dark), 0 8px 14px rgba(90, 50, 120, 0.25);
+}
+
+.btn.sound:active {
+  box-shadow: 0 1px 0 var(--lavender-dark);
+}
+
 .btn.off {
-  background: linear-gradient(#c9b6d6, #a58bb8);
-  box-shadow: 0 4px 0 #7c5f93, 0 8px 14px rgba(60, 20, 90, 0.2);
+  background: linear-gradient(#cbbcd4, #a090ad);
+  box-shadow: 0 4px 0 #7c6f87, 0 8px 14px rgba(60, 20, 90, 0.2);
 }
 
 #toast {

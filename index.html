@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#ff9ccf" />
+    <meta name="theme-color" content="#e3b65c" />
     <title>Jenny's Jems</title>
   </head>
   <body>
@@ -14,18 +14,27 @@
     <div id="app">
       <header>
         <h1>Jenny's Jems</h1>
+        <p class="subtitle"><span class="deco">〜</span> 제니의 보석 <span class="deco">〜</span></p>
         <div class="hud">
-          <div class="pill">Score <span id="score">0</span></div>
-          <div class="pill">Best <span id="best">0</span></div>
+          <div class="pill">
+            <span class="kr">점수</span>
+            <span class="en">Score</span>
+            <span class="val" id="score">0</span>
+          </div>
+          <div class="pill">
+            <span class="kr">최고</span>
+            <span class="en">Best</span>
+            <span class="val" id="best">0</span>
+          </div>
         </div>
       </header>
       <main id="stage">
-        <canvas id="board" aria-label="Game board"></canvas>
+        <canvas id="board" aria-label="게임 보드"></canvas>
         <div id="toast" aria-live="polite"></div>
       </main>
       <footer>
-        <button class="btn" id="new-game" type="button">New Game</button>
-        <button class="btn" id="sound" type="button" aria-pressed="true">Sound: On</button>
+        <button class="btn" id="new-game" type="button">새 게임</button>
+        <button class="btn sound" id="sound" type="button" aria-pressed="true">소리: On</button>
       </footer>
     </div>
     <script type="module" src="/src/main.ts"></script>

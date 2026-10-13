@@ -51,7 +51,7 @@ newGameBtn.addEventListener('click', () => {
 });
 
 function renderSoundButton(): void {
-  soundBtn.textContent = sfx.muted ? 'Sound: Off' : 'Sound: On';
+  soundBtn.textContent = sfx.muted ? '소리: Off' : '소리: On';
   soundBtn.setAttribute('aria-pressed', String(!sfx.muted));
   soundBtn.classList.toggle('off', sfx.muted);
 }

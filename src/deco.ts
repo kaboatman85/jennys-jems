@@ -2,13 +2,14 @@
 
 type Ctx2D = CanvasRenderingContext2D;
 
+// Cherry-blossom (sakura) palette: soft pinks and whites with a rose/gold center.
 export const FLOWER_COLORS: Array<[string, string]> = [
-  ['#ff8fc7', '#ffe066'],
-  ['#ffa27a', '#fff2a8'],
-  ['#ffd84d', '#ff9a3c'],
-  ['#c59bff', '#ffe066'],
-  ['#7ec8ff', '#fff2a8'],
-  ['#ffffff', '#ffc94d'],
+  ['#ffd1e0', '#ff8fae'],
+  ['#ffe8ee', '#ffb6c9'],
+  ['#ffffff', '#ffb6c9'],
+  ['#ffc2d6', '#ff6f91'],
+  ['#fff0f5', '#e8a0bb'],
+  ['#ffd8e6', '#e85d8a'],
 ];
 
 export function drawFlower(

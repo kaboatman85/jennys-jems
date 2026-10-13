@@ -6,7 +6,7 @@ import type { Grid, Pos } from './board.ts';
 import type { GemArt, OverlayArt } from './gems.ts';
 import type { Particle } from './particles.ts';
 import type { Sprite } from './sprites.ts';
-import { drawFlower, drawLeaf } from './deco.ts';
+import { FLOWER_COLORS, drawFlower, drawLeaf } from './deco.ts';
 
 /** roundRect() needs a fairly recent browser; arcTo works everywhere. */
 export function roundRectPath(
@@ -40,7 +40,7 @@ export interface FrameGeometry {
   canvasH: number;
 }
 
-/** Pre-renders the pink floral frame, dark plum board, and checkered cells. */
+/** Pre-renders the gold cherry-blossom frame, cream board, and checkered cells. */
 export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
   const { cell, pad, bleed, dpr, cssW, cssH, ox, oy } = geo;
   const cv = document.createElement('canvas');
@@ -57,29 +57,29 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
   const bw = cssW - 2 * bleed;
   const bh = cssH - 2 * bleed;
   const band = c.createLinearGradient(0, by, 0, by + bh);
-  band.addColorStop(0, '#ff9ccf');
-  band.addColorStop(0.5, '#ff6fb5');
-  band.addColorStop(1, '#e14b9f');
+  band.addColorStop(0, '#f3cf7e');
+  band.addColorStop(0.5, '#e3b65c');
+  band.addColorStop(1, '#c9943a');
   rr(bx, by, bw, bh, cell * 0.42);
   c.fillStyle = band;
   c.fill();
   c.lineWidth = Math.max(2, cell * 0.05);
-  c.strokeStyle = 'rgba(255,255,255,0.85)';
+  c.strokeStyle = 'rgba(255,250,235,0.85)';
   c.stroke();
 
-  // Dark plum board.
+  // Cream board.
   const ix = bx + pad * 0.45;
   const iy = by + pad * 0.45;
   const iw = bw - pad * 0.9;
   const ih = bh - pad * 0.9;
-  const plum = c.createLinearGradient(0, iy, 0, iy + ih);
-  plum.addColorStop(0, '#47205f');
-  plum.addColorStop(1, '#2a1240');
+  const cream = c.createLinearGradient(0, iy, 0, iy + ih);
+  cream.addColorStop(0, '#fff6e6');
+  cream.addColorStop(1, '#ffe9c4');
   rr(ix, iy, iw, ih, cell * 0.3);
-  c.fillStyle = plum;
+  c.fillStyle = cream;
   c.fill();
   c.lineWidth = Math.max(1.5, cell * 0.03);
-  c.strokeStyle = 'rgba(255,214,235,0.8)';
+  c.strokeStyle = 'rgba(201,148,58,0.65)';
   c.stroke();
 
   // Checkered cells.
@@ -87,20 +87,20 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
   for (let r = 0; r < ROWS; r++) {
     for (let col = 0; col < COLS; col++) {
       rr(ox + col * cell + gap, oy + r * cell + gap, cell - 2 * gap, cell - 2 * gap, cell * 0.14);
-      c.fillStyle = (r + col) % 2 ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.14)';
+      c.fillStyle = (r + col) % 2 ? 'rgba(201,148,58,0.05)' : 'rgba(201,148,58,0.1)';
       c.fill();
     }
   }
 
-  // Flowers + leaves around the frame.
-  const leaf = '#7fd391';
+  // Cherry blossoms + leaves around the frame.
+  const leaf = '#9bc9a0';
   const midY = by + pad * 0.25;
   const rBand = Math.max(pad * 0.62, 9);
   const edge = (x: number, y: number, angle: number, ci: number): void => {
     drawLeaf(c, x, y, rBand * 2.1, angle - 0.5, leaf);
     drawLeaf(c, x, y, rBand * 2.1, angle + 0.5, leaf);
-    const petals = ['#ffffff', '#ffe066', '#c59bff', '#7ec8ff'];
-    drawFlower(c, x, y, rBand, petals[ci % petals.length]!, '#ff9a3c', 6, ci);
+    const [petal, center] = FLOWER_COLORS[ci % FLOWER_COLORS.length]!;
+    drawFlower(c, x, y, rBand, petal, center, 5, ci);
   };
   for (let i = 1; i < COLS; i += 2) {
     const x = ox + i * cell + cell * 0.5 * (i % 2 ? 1 : 0);
@@ -112,16 +112,17 @@ export function buildFrame(geo: FrameGeometry): HTMLCanvasElement {
     edge(bx + pad * 0.3, y, Math.PI, i + 2);
     edge(bx + bw - pad * 0.3, y, 0, i + 3);
   }
-  const corner = (x: number, y: number, a: number, petal: string): void => {
+  const corner = (x: number, y: number, a: number, ci: number): void => {
     drawLeaf(c, x, y, cell * 0.55, a - 0.6, leaf);
-    drawLeaf(c, x, y, cell * 0.55, a + 0.6, '#8fdca0');
-    drawFlower(c, x, y, cell * 0.38, petal, '#ffe066', 7, a);
+    drawLeaf(c, x, y, cell * 0.55, a + 0.6, '#aed9b2');
+    const [petal, center] = FLOWER_COLORS[ci % FLOWER_COLORS.length]!;
+    drawFlower(c, x, y, cell * 0.38, petal, center, 5, a);
   };
   const o = cell * 0.24;
-  corner(bx + o, by + o, (-3 * Math.PI) / 4, '#ffd84d');
-  corner(bx + bw - o, by + o, -Math.PI / 4, '#c59bff');
-  corner(bx + o, by + bh - o, (3 * Math.PI) / 4, '#7ec8ff');
-  corner(bx + bw - o, by + bh - o, Math.PI / 4, '#ffffff');
+  corner(bx + o, by + o, (-3 * Math.PI) / 4, 0);
+  corner(bx + bw - o, by + o, -Math.PI / 4, 1);
+  corner(bx + o, by + bh - o, (3 * Math.PI) / 4, 2);
+  corner(bx + bw - o, by + bh - o, Math.PI / 4, 3);
   return cv;
 }
 
@@ -162,10 +163,10 @@ export function draw(now: number, s: DrawState): void {
     const x = s.ox + s.selected.c * cell;
     const y = s.oy + s.selected.r * cell;
     roundRectPath(ctx, x + cell * 0.03, y + cell * 0.03, cell * 0.94, cell * 0.94, cell * 0.16);
-    ctx.fillStyle = `rgba(255,255,255,${0.16 + 0.12 * pulse})`;
+    ctx.fillStyle = `rgba(255,143,174,${0.14 + 0.1 * pulse})`;
     ctx.fill();
     ctx.lineWidth = Math.max(2, cell * 0.05);
-    ctx.strokeStyle = `rgba(255,236,150,${0.65 + 0.35 * pulse})`;
+    ctx.strokeStyle = `rgba(212,168,67,${0.75 + 0.35 * pulse})`;
     ctx.stroke();
   }
 

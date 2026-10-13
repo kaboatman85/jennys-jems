@@ -30,7 +30,7 @@ export interface GameHooks {
   onToast(text: string): void;
 }
 
-const COMBO_WORDS = ['', '', 'Sweet!', 'Juicy!', 'Fabulous!', 'Jem-tastic!'];
+const COMBO_WORDS = ['', '', '달콤해요!', '짜릿해요!', '환상적이에요!', '최고예요!'];
 const COMBO_SWAP_BONUS = 150;
 
 const posKey = (p: Pos): number => p.r * 1000 + p.c;
@@ -318,7 +318,7 @@ export class Game {
 
   private async ensurePlayable(gen: number): Promise<void> {
     if (findMoves(this.grid).length > 0) return;
-    this.hooks.onToast('No moves - shuffling!');
+    this.hooks.onToast('이동할 수 없어요! 섞는 중...');
     sfx.play('shuffle');
     await new Promise<void>((r) => setTimeout(r, 450));
     if (gen !== this.gen) return;
