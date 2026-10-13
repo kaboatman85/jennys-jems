@@ -74,23 +74,28 @@ h1 {
   margin: 0 6px;
 }
 
-.hud {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 8px;
-}
-
 .pill {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0;
   background: rgba(255, 246, 232, 0.92);
   border: 3px solid var(--gold);
-  border-radius: 22px;
-  padding: 4px 18px 6px;
+  border-radius: 28px;
+  padding: 10px 30px 12px;
+  min-width: clamp(110px, 12vw, 150px);
   box-shadow: 0 3px 0 rgba(201, 148, 58, 0.45);
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: clamp(4px, 3vh, 28px);
+}
+
+#pill-score {
+  order: 1;
+}
+#pill-best {
+  order: 3;
 }
 
 .pill .kr {
@@ -117,17 +122,46 @@ h1 {
 }
 
 #stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 28px);
+  min-height: 0;
+  padding: 4px;
+}
+
+.board-wrap {
   position: relative;
   display: grid;
   place-items: center;
+  order: 2;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
-  padding: 4px;
 }
 
 #board {
   display: block;
   touch-action: none;
   filter: drop-shadow(0 10px 16px rgba(120, 80, 30, 0.3));
+}
+
+/* Narrow/portrait screens: pills group above the board instead of flanking it. */
+@media (max-width: 760px) {
+  .board-wrap {
+    order: 3;
+    flex-basis: 100%;
+  }
+  #pill-score {
+    order: 1;
+  }
+  #pill-best {
+    order: 2;
+  }
+  .pill {
+    margin-top: 0;
+  }
 }
 
 footer {

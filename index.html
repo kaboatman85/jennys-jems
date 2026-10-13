@@ -15,22 +15,22 @@
       <header>
         <h1>Jenny's Jems</h1>
         <p class="subtitle"><span class="deco">〜</span> 제니의 보석 <span class="deco">〜</span></p>
-        <div class="hud">
-          <div class="pill">
-            <span class="kr">점수</span>
-            <span class="en">Score</span>
-            <span class="val" id="score">0</span>
-          </div>
-          <div class="pill">
-            <span class="kr">최고</span>
-            <span class="en">Best</span>
-            <span class="val" id="best">0</span>
-          </div>
-        </div>
       </header>
       <main id="stage">
-        <canvas id="board" aria-label="게임 보드"></canvas>
-        <div id="toast" aria-live="polite"></div>
+        <div class="pill" id="pill-score">
+          <span class="kr">점수</span>
+          <span class="en">Score</span>
+          <span class="val" id="score">0</span>
+        </div>
+        <div class="board-wrap">
+          <canvas id="board" aria-label="게임 보드"></canvas>
+          <div id="toast" aria-live="polite"></div>
+        </div>
+        <div class="pill" id="pill-best">
+          <span class="kr">최고</span>
+          <span class="en">Best</span>
+          <span class="val" id="best">0</span>
+        </div>
       </main>
       <footer>
         <button class="btn" id="new-game" type="button">새 게임</button>

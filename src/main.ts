@@ -7,7 +7,7 @@ import { drawBackground } from './bg.ts';
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 const board = el<HTMLCanvasElement>('board');
-const stage = el<HTMLElement>('stage');
+const boardWrap = document.querySelector<HTMLElement>('.board-wrap')!;
 const bg = el<HTMLCanvasElement>('bg');
 const scoreEl = el<HTMLElement>('score');
 const bestEl = el<HTMLElement>('best');
@@ -32,18 +32,18 @@ const game = new Game(board, new GemSprites(), {
 
 function relayout(): void {
   drawBackground(bg);
-  game.layout(stage.clientWidth, stage.clientHeight);
+  game.layout(boardWrap.clientWidth, boardWrap.clientHeight);
 }
 
 let started = false;
 new ResizeObserver(() => {
-  if (stage.clientWidth === 0 || stage.clientHeight === 0) return;
+  if (boardWrap.clientWidth === 0 || boardWrap.clientHeight === 0) return;
   relayout();
   if (!started) {
     started = true;
     void game.newGame();
   }
-}).observe(stage);
+}).observe(boardWrap);
 
 newGameBtn.addEventListener('click', () => {
   sfx.unlock();
