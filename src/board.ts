@@ -4,9 +4,16 @@ export const ROWS = 8;
 export const COLS = 8;
 export const TYPES = 6;
 
+export type SpecialKind = 'laser' | 'bomb' | 'hypercube' | 'star';
+export interface Special {
+  kind: SpecialKind;
+  /** Laser only: which direction it clears. */
+  orientation?: 'h' | 'v';
+}
 export interface Gem {
   id: number;
   type: number;
+  special?: Special;
 }
 export type Cell = Gem | null;
 export type Grid = Cell[][];

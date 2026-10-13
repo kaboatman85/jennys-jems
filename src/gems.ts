@@ -1,6 +1,8 @@
 // Procedural 3D-looking gems. drawGem() only needs a 2D context, so it also
 // runs under node (@napi-rs/canvas) for visual checks.
 
+import type { Special } from './board.ts';
+
 type Ctx2D = CanvasRenderingContext2D;
 type RGB = [number, number, number];
 interface Pt {
@@ -219,6 +221,174 @@ export class GemSprites implements GemArt {
       cv.width = px;
       cv.height = px;
       drawGem(cv.getContext('2d')!, type, px);
+      this.cache.set(key, cv);
+    }
+    return cv;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// --- Special-piece overlays: glow/stripe/ring art drawn on top of the base gem
+// sprite, so any color can carry any special. Pure (ctx, special, S) => void,
+// same shape as drawGem, so it also runs headlessly under @napi-rs/canvas.
+
+function drawLaserOverlay(ctx: Ctx2D, orientation: 'h' | 'v' | undefined, S: number): void {
+  ctx.save();
+  if (orientation === 'v') {
+    ctx.translate(S / 2, S / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.translate(-S / 2, -S / 2);
+  }
+  const midY = S / 2;
+  const halfW = S * 0.085;
+
+  const glow = ctx.createLinearGradient(0, midY, S, midY);
+  glow.addColorStop(0, 'rgba(255,255,255,0)');
+  glow.addColorStop(0.15, 'rgba(255,255,255,0.55)');
+  glow.addColorStop(0.5, 'rgba(255,255,255,0.7)');
+  glow.addColorStop(0.85, 'rgba(255,255,255,0.55)');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, midY - halfW, S, halfW * 2);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillRect(0, midY - halfW * 0.3, S, halfW * 0.6);
+
+  const ah = S * 0.07;
+  for (const [x, dir] of [
+    [S * 0.07, 1],
+    [S * 0.93, -1],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x, midY - ah);
+    ctx.lineTo(x + dir * ah * 1.3, midY);
+    ctx.lineTo(x, midY + ah);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBombOverlay(ctx: Ctx2D, S: number): void {
+  const cx = S / 2;
+  const cy = S / 2;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,120,40,0.9)';
+  ctx.lineWidth = S * 0.035;
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.38, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,210,120,0.55)';
+  ctx.lineWidth = S * 0.02;
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.3, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,170,40,0.95)';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - S * 0.12);
+  ctx.quadraticCurveTo(cx + S * 0.09, cy - S * 0.02, cx + S * 0.04, cy + S * 0.1);
+  ctx.quadraticCurveTo(cx, cy + S * 0.14, cx - S * 0.04, cy + S * 0.1);
+  ctx.quadraticCurveTo(cx - S * 0.09, cy - S * 0.02, cx, cy - S * 0.12);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,240,180,0.9)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + S * 0.03, S * 0.025, S * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHypercubeOverlay(ctx: Ctx2D, S: number): void {
+  const cx = S / 2;
+  const cy = S / 2;
+  const n = 10;
+  const ringR = S * 0.38;
+  ctx.save();
+  for (let i = 0; i < n; i++) {
+    const th0 = (i / n) * Math.PI * 2;
+    const th1 = ((i + 1) / n) * Math.PI * 2;
+    const hue = (i / n) * 360;
+    ctx.strokeStyle = `hsla(${hue},90%,65%,0.85)`;
+    ctx.lineWidth = S * 0.05;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR, th0, th1);
+    ctx.stroke();
+  }
+  sparkle(ctx, cx - S * 0.28, cy - S * 0.26, S * 0.05, 0.9);
+  sparkle(ctx, cx + S * 0.27, cy + S * 0.25, S * 0.04, 0.8);
+  ctx.restore();
+}
+
+function drawStarOverlay(ctx: Ctx2D, S: number): void {
+  const cx = S / 2;
+  const cy = S / 2;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = S * 0.045;
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.46, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const rays = 8;
+  for (let i = 0; i < rays; i++) {
+    const th = (i / rays) * Math.PI * 2;
+    const x1 = cx + Math.cos(th) * S * 0.2;
+    const y1 = cy + Math.sin(th) * S * 0.2;
+    const x2 = cx + Math.cos(th) * S * 0.5;
+    const y2 = cy + Math.sin(th) * S * 0.5;
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+    grad.addColorStop(0, 'rgba(255,255,210,0.9)');
+    grad.addColorStop(1, 'rgba(255,255,210,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = S * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  sparkle(ctx, cx, cy, S * 0.09, 0.95);
+  ctx.restore();
+}
+
+/** Draws a special-piece overlay (glow/stripes/rings) on top of a base gem sprite. */
+export function drawSpecialOverlay(ctx: Ctx2D, special: Special, S: number): void {
+  switch (special.kind) {
+    case 'laser':
+      drawLaserOverlay(ctx, special.orientation, S);
+      break;
+    case 'bomb':
+      drawBombOverlay(ctx, S);
+      break;
+    case 'hypercube':
+      drawHypercubeOverlay(ctx, S);
+      break;
+    case 'star':
+      drawStarOverlay(ctx, S);
+      break;
+  }
+}
+
+/** Anything that can supply special-overlay images. */
+export interface OverlayArt {
+  get(special: Special, px: number): CanvasImageSource;
+  clear?(): void;
+}
+
+export class SpecialOverlaySprites implements OverlayArt {
+  private cache = new Map<string, HTMLCanvasElement>();
+
+  get(special: Special, px: number): HTMLCanvasElement {
+    const key = `${special.kind}@${special.orientation ?? ''}@${px}`;
+    let cv = this.cache.get(key);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = px;
+      cv.height = px;
+      drawSpecialOverlay(cv.getContext('2d')!, special, px);
       this.cache.set(key, cv);
     }
     return cv;

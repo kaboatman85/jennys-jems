@@ -1,6 +1,6 @@
 import { loadJSON, saveJSON } from './storage.ts';
 
-export type SfxKind = 'swap' | 'invalid' | 'match' | 'shuffle';
+export type SfxKind = 'swap' | 'invalid' | 'match' | 'shuffle' | 'special' | 'combo';
 
 // C major pentatonic, so stacked cascades always sound pleasant.
 const SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.51, 1567.98];
@@ -79,6 +79,15 @@ class Sfx {
       }
       case 'shuffle':
         this.tone(ac, t, 300, 0.35, 'triangle', 0.1, 900);
+        break;
+      case 'special':
+        this.tone(ac, t, 660, 0.12, 'triangle', 0.14, 1320);
+        this.tone(ac, t + 0.05, 990, 0.18, 'sine', 0.1, 1760);
+        break;
+      case 'combo':
+        this.tone(ac, t, 160, 0.22, 'sawtooth', 0.12, 80);
+        this.tone(ac, t + 0.04, 880, 0.3, 'triangle', 0.14, 1760);
+        this.tone(ac, t + 0.1, 1318.51, 0.3, 'sine', 0.1);
         break;
     }
   }

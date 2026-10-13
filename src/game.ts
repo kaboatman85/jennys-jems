@@ -2,7 +2,6 @@ import {
   COLS,
   ROWS,
   TYPES,
-  areAdjacent,
   cellsOfRuns,
   collapse,
   createGrid,
@@ -12,79 +11,41 @@ import {
   shuffleGrid,
   swapCells,
 } from './board.ts';
-import type { Fall, Gem, Grid, Pos, Rng } from './board.ts';
-import { GEM_DEFS } from './gems.ts';
-import type { GemArt } from './gems.ts';
-import { drawFlower, drawLeaf } from './deco.ts';
+import type { Fall, Grid, Pos, Rng } from './board.ts';
+import { GEM_DEFS, SpecialOverlaySprites } from './gems.ts';
+import type { GemArt, OverlayArt } from './gems.ts';
+import { comboActivation, expandActivation, planSpecials } from './specials.ts';
 import { sfx } from './audio.ts';
 import { loadJSON, saveJSON } from './storage.ts';
-
-interface Sprite {
-  gem: Gem;
-  x: number; // column position, in cell units (fractional while animating)
-  y: number; // row position, in cell units
-  sx: number;
-  sy: number;
-  a: number;
-}
-
-interface Tween {
-  t0: number;
-  durMs: number;
-  update: (k: number) => void;
-  done: () => void;
-}
-
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  max: number;
-  size: number;
-  color: string;
-}
-
-interface MoveItem {
-  s: Sprite;
-  x: number;
-  y: number;
-  dur: number;
-  ease: (t: number) => number;
-}
+import { TweenEngine, easeInOutCubic, easeInQuad } from './tween.ts';
+import { animateMany, landSquash } from './sprites.ts';
+import type { MoveItem, Sprite } from './sprites.ts';
+import { ParticleSystem } from './particles.ts';
+import { BoardInput } from './board-input.ts';
+import type { BoardGeometry } from './board-input.ts';
+import { buildFrame, draw } from './board-render.ts';
 
 export interface GameHooks {
   onScore(score: number, best: number): void;
   onToast(text: string): void;
 }
 
-const easeInQuad = (t: number): number => t * t;
-const easeInOutCubic = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-/** roundRect() needs a fairly recent browser; arcTo works everywhere. */
-function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-  const rad = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rad, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rad);
-  ctx.arcTo(x + w, y + h, x, y + h, rad);
-  ctx.arcTo(x, y + h, x, y, rad);
-  ctx.arcTo(x, y, x + w, y, rad);
-  ctx.closePath();
-}
-
 const COMBO_WORDS = ['', '', 'Sweet!', 'Juicy!', 'Fabulous!', 'Jem-tastic!'];
+const COMBO_SWAP_BONUS = 150;
+
+const posKey = (p: Pos): number => p.r * 1000 + p.c;
 
 export class Game {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private art: GemArt;
+  private overlayArt: OverlayArt = new SpecialOverlaySprites();
   private hooks: GameHooks;
 
   private grid: Grid = [];
   private sprites = new Map<number, Sprite>();
-  private tweens: Tween[] = [];
-  private particles: Particle[] = [];
+  private tweenEngine = new TweenEngine();
+  private particles = new ParticleSystem();
 
   private cell = 48;
   private pad = 12;
@@ -97,7 +58,6 @@ export class Game {
   private busy = false;
   private gen = 0;
   private selected: Pos | null = null;
-  private drag: { start: Pos; x: number; y: number; id: number } | null = null;
 
   private score = 0;
   private best: number = loadJSON<number>('jj.best', 0);
@@ -109,10 +69,20 @@ export class Game {
     this.ctx = canvas.getContext('2d')!;
     this.art = art;
     this.hooks = hooks;
-    canvas.addEventListener('pointerdown', this.onDown);
-    canvas.addEventListener('pointermove', this.onMove);
-    canvas.addEventListener('pointerup', this.onUp);
-    canvas.addEventListener('pointercancel', this.onUp);
+    new BoardInput(
+      canvas,
+      (): BoardGeometry => ({ ox: this.ox, oy: this.oy, cell: this.cell, cssW: this.cssW }),
+      {
+        isBusy: () => this.busy,
+        getSelected: () => this.selected,
+        onSelect: (p) => {
+          this.selected = p;
+        },
+        onSwapAttempt: (a, b) => {
+          void this.attemptSwap(a, b);
+        },
+      },
+    );
     this.hooks.onScore(this.score, this.best);
     requestAnimationFrame(this.loop);
   }
@@ -132,7 +102,19 @@ export class Game {
     this.canvas.width = Math.round(this.cssW * this.dpr);
     this.canvas.height = Math.round(this.cssH * this.dpr);
     this.art.clear?.();
-    this.frame = this.buildFrame();
+    this.overlayArt.clear?.();
+    this.frame = buildFrame({
+      cell: this.cell,
+      pad: this.pad,
+      bleed: this.bleed,
+      dpr: this.dpr,
+      cssW: this.cssW,
+      cssH: this.cssH,
+      ox: this.ox,
+      oy: this.oy,
+      canvasW: this.canvas.width,
+      canvasH: this.canvas.height,
+    });
   }
 
   private get ox(): number {
@@ -140,91 +122,6 @@ export class Game {
   }
   private get oy(): number {
     return this.bleed + this.pad;
-  }
-
-  /** Pre-renders the pink floral frame, dark plum board, and checkered cells. */
-  private buildFrame(): HTMLCanvasElement {
-    const { cell, pad, bleed, dpr, cssW, cssH } = this;
-    const cv = document.createElement('canvas');
-    cv.width = this.canvas.width;
-    cv.height = this.canvas.height;
-    const c = cv.getContext('2d')!;
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const rr = (x: number, y: number, w: number, h: number, r: number): void => roundRectPath(c, x, y, w, h, r);
-
-    // Frame band.
-    const bx = bleed;
-    const by = bleed;
-    const bw = cssW - 2 * bleed;
-    const bh = cssH - 2 * bleed;
-    const band = c.createLinearGradient(0, by, 0, by + bh);
-    band.addColorStop(0, '#ff9ccf');
-    band.addColorStop(0.5, '#ff6fb5');
-    band.addColorStop(1, '#e14b9f');
-    rr(bx, by, bw, bh, cell * 0.42);
-    c.fillStyle = band;
-    c.fill();
-    c.lineWidth = Math.max(2, cell * 0.05);
-    c.strokeStyle = 'rgba(255,255,255,0.85)';
-    c.stroke();
-
-    // Dark plum board.
-    const ix = bx + pad * 0.45;
-    const iy = by + pad * 0.45;
-    const iw = bw - pad * 0.9;
-    const ih = bh - pad * 0.9;
-    const plum = c.createLinearGradient(0, iy, 0, iy + ih);
-    plum.addColorStop(0, '#47205f');
-    plum.addColorStop(1, '#2a1240');
-    rr(ix, iy, iw, ih, cell * 0.3);
-    c.fillStyle = plum;
-    c.fill();
-    c.lineWidth = Math.max(1.5, cell * 0.03);
-    c.strokeStyle = 'rgba(255,214,235,0.8)';
-    c.stroke();
-
-    // Checkered cells.
-    const gap = cell * 0.04;
-    for (let r = 0; r < ROWS; r++) {
-      for (let col = 0; col < COLS; col++) {
-        rr(this.ox + col * cell + gap, this.oy + r * cell + gap, cell - 2 * gap, cell - 2 * gap, cell * 0.14);
-        c.fillStyle = (r + col) % 2 ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.14)';
-        c.fill();
-      }
-    }
-
-    // Flowers + leaves around the frame.
-    const leaf = '#7fd391';
-    const midY = by + pad * 0.25;
-    const rBand = Math.max(pad * 0.62, 9);
-    const edge = (x: number, y: number, angle: number, ci: number): void => {
-      drawLeaf(c, x, y, rBand * 2.1, angle - 0.5, leaf);
-      drawLeaf(c, x, y, rBand * 2.1, angle + 0.5, leaf);
-      const petals = ['#ffffff', '#ffe066', '#c59bff', '#7ec8ff'];
-      drawFlower(c, x, y, rBand, petals[ci % petals.length]!, '#ff9a3c', 6, ci);
-    };
-    for (let i = 1; i < COLS; i += 2) {
-      const x = this.ox + i * cell + cell * 0.5 * (i % 2 ? 1 : 0);
-      edge(x, midY + pad * 0.1, -Math.PI / 2, i);
-      edge(x, by + bh - pad * 0.35, Math.PI / 2, i + 1);
-    }
-    for (let i = 1; i < ROWS; i += 2) {
-      const y = this.oy + i * cell;
-      edge(bx + pad * 0.3, y, Math.PI, i + 2);
-      edge(bx + bw - pad * 0.3, y, 0, i + 3);
-    }
-    const corner = (x: number, y: number, a: number, petal: string): void => {
-      drawLeaf(c, x, y, cell * 0.55, a - 0.6, leaf);
-      drawLeaf(c, x, y, cell * 0.55, a + 0.6, '#8fdca0');
-      drawFlower(c, x, y, cell * 0.38, petal, '#ffe066', 7, a);
-    };
-    const o = cell * 0.24;
-    corner(bx + o, by + o, (-3 * Math.PI) / 4, '#ffd84d');
-    corner(bx + bw - o, by + o, -Math.PI / 4, '#c59bff');
-    corner(bx + o, by + bh - o, (3 * Math.PI) / 4, '#7ec8ff');
-    corner(bx + bw - o, by + bh - o, Math.PI / 4, '#ffffff');
-    return cv;
   }
 
   // ------------------------------------------------------------- hints
@@ -255,10 +152,9 @@ export class Game {
   async newGame(): Promise<void> {
     this.gen++;
     const gen = this.gen;
-    this.flushTweens();
-    this.particles = [];
+    this.tweenEngine.flush();
+    this.particles.list = [];
     this.selected = null;
-    this.drag = null;
     this.score = 0;
     this.hooks.onScore(this.score, this.best);
     this.busy = true;
@@ -274,9 +170,9 @@ export class Game {
         items.push({ s, x: c, y: r, dur: 0.35 + r * 0.05 + c * 0.015, ease: easeInQuad });
       }
     }
-    await this.animateMany(items);
+    await animateMany(this.tweenEngine, items);
     if (gen !== this.gen) return;
-    await this.landSquash(items.map((i) => i.s));
+    await landSquash(this.tweenEngine, items.map((i) => i.s));
     if (gen === this.gen) this.busy = false;
   }
 
@@ -292,24 +188,34 @@ export class Game {
       const sb = this.sprites.get(gb.id)!;
 
       sfx.play('swap');
-      await this.animateMany([
+      await animateMany(this.tweenEngine, [
         { s: sa, x: b.c, y: b.r, dur: 0.16, ease: easeInOutCubic },
         { s: sb, x: a.c, y: a.r, dur: 0.16, ease: easeInOutCubic },
       ]);
       if (gen !== this.gen) return;
       swapCells(this.grid, a, b);
 
-      if (findRuns(this.grid).length === 0) {
+      // A combo swap (e.g. Hypercube+Laser) is legal even with no resulting run match;
+      // a plain gem next to a special still needs an actual match to be legal.
+      const combo = comboActivation(this.grid, a, b);
+      if (!combo && findRuns(this.grid).length === 0) {
         swapCells(this.grid, a, b);
         sfx.play('invalid');
-        await this.animateMany([
+        await animateMany(this.tweenEngine, [
           { s: sa, x: a.c, y: a.r, dur: 0.16, ease: easeInOutCubic },
           { s: sb, x: b.c, y: b.r, dur: 0.16, ease: easeInOutCubic },
         ]);
         return;
       }
 
-      await this.resolve(gen);
+      if (combo) {
+        sfx.play('combo');
+        await this.resolveCleared(gen, combo.cleared, 1, COMBO_SWAP_BONUS);
+        if (gen !== this.gen) return;
+        await this.resolve(gen, []);
+      } else {
+        await this.resolve(gen, [a, b]);
+      }
       if (gen !== this.gen) return;
       await this.ensurePlayable(gen);
     } finally {
@@ -317,52 +223,74 @@ export class Game {
     }
   }
 
-  /** Clear matches, drop, refill; repeat until the board settles. */
-  private async resolve(gen: number): Promise<void> {
+  /**
+   * Clear matches, drop, refill; repeat until the board settles. swapEndpoints (the
+   * player's swap positions) only matter for the first iteration's special placement.
+   */
+  private async resolve(gen: number, swapEndpoints: Pos[] = []): Promise<void> {
     let combo = 0;
     for (;;) {
       const runs = findRuns(this.grid);
       if (runs.length === 0) break;
       combo++;
 
-      let pts = 0;
+      // Mutate in place (not a new object): sprites hold a direct reference to the gem
+      // object keyed by id, so replacing it here would desync the sprite's `.special`
+      // from what's in the grid even though the id still matches.
+      const plans = planSpecials(runs, combo === 1 ? swapEndpoints : []);
+      for (const plan of plans) {
+        this.grid[plan.pos.r]![plan.pos.c]!.special = plan.special;
+      }
+      const upgraded = new Set(plans.map((p) => posKey(p.pos)));
+      const seedCells = cellsOfRuns(runs).filter((p) => !upgraded.has(posKey(p)));
+      const { cleared } = expandActivation(this.grid, seedCells);
+
+      let shapeBonus = 0;
       for (const run of runs) {
         const n = run.cells.length;
-        pts += n * 10 + (n === 4 ? 40 : n >= 5 ? 100 : 0);
+        shapeBonus += n === 4 ? 40 : n >= 5 ? 100 : 0;
       }
-      this.score += pts * combo;
-      if (this.score > this.best) {
-        this.best = this.score;
-        saveJSON('jj.best', this.best);
-      }
-      this.hooks.onScore(this.score, this.best);
+
       sfx.play('match', combo);
+      if (plans.length > 0) sfx.play('special');
       if (combo >= 2) this.hooks.onToast(COMBO_WORDS[Math.min(combo, COMBO_WORDS.length - 1)]!);
 
-      const cells = cellsOfRuns(runs);
-      await this.clearCells(cells);
-      if (gen !== this.gen) return;
-
-      const { falls, spawns } = collapse(this.grid, TYPES, this.rng);
-      const items: MoveItem[] = [];
-      const moved: Sprite[] = [];
-      const add = (f: Fall, isNew: boolean): void => {
-        let s = this.sprites.get(f.gem.id);
-        if (isNew || !s) {
-          s = { gem: f.gem, x: f.c, y: f.fromR, sx: 1, sy: 1, a: 1 };
-          this.sprites.set(f.gem.id, s);
-        }
-        const dist = f.toR - s.y;
-        items.push({ s, x: f.c, y: f.toR, dur: Math.min(0.62, 0.13 + 0.07 * dist), ease: easeInQuad });
-        moved.push(s);
-      };
-      for (const f of falls) add(f, false);
-      for (const f of spawns) add(f, true);
-      await this.animateMany(items);
-      if (gen !== this.gen) return;
-      await this.landSquash(moved);
+      await this.resolveCleared(gen, cleared, combo, shapeBonus);
       if (gen !== this.gen) return;
     }
+  }
+
+  /** Score, clear a set of cells (from a match or a special combo), collapse, and refill. */
+  private async resolveCleared(gen: number, cleared: Pos[], comboMultiplier: number, flatBonus: number): Promise<void> {
+    const pts = cleared.length * 10 + flatBonus;
+    this.score += pts * comboMultiplier;
+    if (this.score > this.best) {
+      this.best = this.score;
+      saveJSON('jj.best', this.best);
+    }
+    this.hooks.onScore(this.score, this.best);
+
+    await this.clearCells(cleared);
+    if (gen !== this.gen) return;
+
+    const { falls, spawns } = collapse(this.grid, TYPES, this.rng);
+    const items: MoveItem[] = [];
+    const moved: Sprite[] = [];
+    const add = (f: Fall, isNew: boolean): void => {
+      let s = this.sprites.get(f.gem.id);
+      if (isNew || !s) {
+        s = { gem: f.gem, x: f.c, y: f.fromR, sx: 1, sy: 1, a: 1 };
+        this.sprites.set(f.gem.id, s);
+      }
+      const dist = f.toR - s.y;
+      items.push({ s, x: f.c, y: f.toR, dur: Math.min(0.62, 0.13 + 0.07 * dist), ease: easeInQuad });
+      moved.push(s);
+    };
+    for (const f of falls) add(f, false);
+    for (const f of spawns) add(f, true);
+    await animateMany(this.tweenEngine, items);
+    if (gen !== this.gen) return;
+    await landSquash(this.tweenEngine, moved);
   }
 
   private async clearCells(cells: Pos[]): Promise<void> {
@@ -372,11 +300,11 @@ export class Game {
       const s = this.sprites.get(gem.id);
       if (s) {
         targets.push(s);
-        this.burst(s.x, s.y, GEM_DEFS[gem.type]!.base);
+        this.particles.burst(s.x, s.y, GEM_DEFS[gem.type]!.base);
       }
       this.grid[p.r]![p.c] = null;
     }
-    await this.tween(0.24, (k) => {
+    await this.tweenEngine.add(0.24, (k) => {
       const grow = k < 0.25 ? 1 + 0.3 * (k / 0.25) : 1.3 * (1 - (k - 0.25) / 0.75);
       const alpha = k < 0.25 ? 1 : 1 - (k - 0.25) / 0.75;
       for (const s of targets) {
@@ -386,20 +314,6 @@ export class Game {
       }
     });
     for (const s of targets) this.sprites.delete(s.gem.id);
-  }
-
-  private async landSquash(list: Sprite[]): Promise<void> {
-    await this.tween(0.13, (k) => {
-      const w = Math.sin(Math.PI * k);
-      for (const s of list) {
-        s.sx = 1 + 0.1 * w;
-        s.sy = 1 - 0.14 * w;
-      }
-    });
-    for (const s of list) {
-      s.sx = 1;
-      s.sy = 1;
-    }
   }
 
   private async ensurePlayable(gen: number): Promise<void> {
@@ -416,191 +330,40 @@ export class Game {
         if (s) items.push({ s, x: c, y: r, dur: 0.5, ease: easeInOutCubic });
       }
     }
-    await this.animateMany(items);
+    await animateMany(this.tweenEngine, items);
   }
 
-  // ------------------------------------------------------------- animation
-
-  private tween(durSec: number, update: (k: number) => void): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.tweens.push({ t0: performance.now(), durMs: durSec * 1000, update, done: resolve });
-    });
-  }
-
-  private animateMany(items: MoveItem[]): Promise<void> {
-    if (items.length === 0) return Promise.resolve();
-    const starts = items.map((i) => ({ x: i.s.x, y: i.s.y }));
-    const maxDur = Math.max(...items.map((i) => i.dur));
-    return this.tween(maxDur, (k) => {
-      items.forEach((it, idx) => {
-        const local = Math.min(1, (k * maxDur) / it.dur);
-        const e = it.ease(local);
-        const st = starts[idx]!;
-        it.s.x = st.x + (it.x - st.x) * e;
-        it.s.y = st.y + (it.y - st.y) * e;
-      });
-    });
-  }
-
-  /** Finish every running tween immediately (used when a new game interrupts). */
-  private flushTweens(): void {
-    const pending = this.tweens;
-    this.tweens = [];
-    for (const t of pending) {
-      t.update(1);
-      t.done();
-    }
-  }
-
-  private burst(x: number, y: number, color: string): void {
-    for (let i = 0; i < 8; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const sp = 1.2 + Math.random() * 2.6;
-      this.particles.push({
-        x: x + 0.5,
-        y: y + 0.5,
-        vx: Math.cos(ang) * sp,
-        vy: Math.sin(ang) * sp - 1.2,
-        life: 0.55,
-        max: 0.55,
-        size: 0.05 + Math.random() * 0.07,
-        color,
-      });
-    }
-  }
-
-  // ----------------------------------------------------------------- input
-
-  private cellAt(e: PointerEvent): Pos | null {
-    const rect = this.canvas.getBoundingClientRect();
-    const scale = this.cssW / rect.width || 1;
-    const x = (e.clientX - rect.left) * scale - this.ox;
-    const y = (e.clientY - rect.top) * scale - this.oy;
-    const c = Math.floor(x / this.cell);
-    const r = Math.floor(y / this.cell);
-    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
-    return { r, c };
-  }
-
-  private onDown = (e: PointerEvent): void => {
-    sfx.unlock();
-    if (this.busy) return;
-    const p = this.cellAt(e);
-    if (!p) return;
-    e.preventDefault();
-    this.canvas.setPointerCapture(e.pointerId);
-    if (this.selected && areAdjacent(this.selected, p)) {
-      const a = this.selected;
-      this.selected = null;
-      this.drag = null;
-      void this.attemptSwap(a, p);
-      return;
-    }
-    this.selected = p;
-    this.drag = { start: p, x: e.clientX, y: e.clientY, id: e.pointerId };
-  };
-
-  private onMove = (e: PointerEvent): void => {
-    const d = this.drag;
-    if (!d || d.id !== e.pointerId || this.busy) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    const rect = this.canvas.getBoundingClientRect();
-    const threshold = this.cell * (rect.width / this.cssW) * 0.3;
-    if (Math.hypot(dx, dy) < threshold) return;
-    const target: Pos =
-      Math.abs(dx) > Math.abs(dy)
-        ? { r: d.start.r, c: d.start.c + Math.sign(dx) }
-        : { r: d.start.r + Math.sign(dy), c: d.start.c };
-    this.drag = null;
-    if (target.r < 0 || target.r >= ROWS || target.c < 0 || target.c >= COLS) return;
-    this.selected = null;
-    void this.attemptSwap(d.start, target);
-  };
-
-  private onUp = (e: PointerEvent): void => {
-    if (this.drag && this.drag.id === e.pointerId) this.drag = null;
-  };
-
-  // ------------------------------------------------------------- rendering
+  // ------------------------------------------------------------- render loop
 
   private loop = (now: number): void => {
     const dt = Math.min(0.05, (now - (this.lastFrame || now)) / 1000);
     this.lastFrame = now;
     this.step(dt);
-    this.draw(now);
+    this.drawFrame(now);
     requestAnimationFrame(this.loop);
   };
 
   private step(dt: number): void {
-    const t = performance.now();
-    const running = this.tweens;
-    this.tweens = [];
-    for (const tw of running) {
-      const k = Math.max(0, Math.min(1, (t - tw.t0) / tw.durMs));
-      tw.update(k);
-      if (k >= 1) tw.done();
-      else this.tweens.push(tw);
-    }
-    for (const p of this.particles) {
-      p.life -= dt;
-      p.vy += 6 * dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-    }
-    this.particles = this.particles.filter((p) => p.life > 0);
+    this.tweenEngine.step();
+    this.particles.step(dt);
   }
 
-  private draw(now: number): void {
-    const { ctx, cell, dpr } = this;
-    if (this.cssW === 0) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, this.cssW, this.cssH);
-    if (this.frame) ctx.drawImage(this.frame, 0, 0, this.cssW, this.cssH);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(this.ox, this.oy, COLS * cell, ROWS * cell);
-    ctx.clip();
-
-    const pulse = 0.5 + 0.5 * Math.sin(now / 170);
-    let selId = -1;
-    if (this.selected) {
-      const sg = this.grid[this.selected.r]?.[this.selected.c];
-      if (sg) selId = sg.id;
-      const x = this.ox + this.selected.c * cell;
-      const y = this.oy + this.selected.r * cell;
-      roundRectPath(ctx, x + cell * 0.03, y + cell * 0.03, cell * 0.94, cell * 0.94, cell * 0.16);
-      ctx.fillStyle = `rgba(255,255,255,${0.16 + 0.12 * pulse})`;
-      ctx.fill();
-      ctx.lineWidth = Math.max(2, cell * 0.05);
-      ctx.strokeStyle = `rgba(255,236,150,${0.65 + 0.35 * pulse})`;
-      ctx.stroke();
-    }
-
-    const px = Math.ceil(cell * dpr);
-    for (const s of this.sprites.values()) {
-      const bump = s.gem.id === selId ? 1 + 0.07 * pulse : 1;
-      ctx.save();
-      ctx.translate(this.ox + (s.x + 0.5) * cell, this.oy + (s.y + 0.5) * cell);
-      ctx.scale(s.sx * bump, s.sy * bump);
-      ctx.globalAlpha = Math.max(0, s.a);
-      ctx.drawImage(this.art.get(s.gem.type, px), -cell / 2, -cell / 2, cell, cell);
-      ctx.restore();
-    }
-
-    for (const p of this.particles) {
-      ctx.globalAlpha = Math.max(0, p.life / p.max);
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(this.ox + p.x * cell, this.oy + p.y * cell, p.size * cell, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(this.ox + p.x * cell, this.oy + p.y * cell, p.size * cell * 0.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-    ctx.restore();
+  private drawFrame(now: number): void {
+    draw(now, {
+      ctx: this.ctx,
+      cell: this.cell,
+      dpr: this.dpr,
+      cssW: this.cssW,
+      cssH: this.cssH,
+      ox: this.ox,
+      oy: this.oy,
+      frame: this.frame,
+      grid: this.grid,
+      sprites: this.sprites,
+      particles: this.particles.list,
+      selected: this.selected,
+      art: this.art,
+      overlayArt: this.overlayArt,
+    });
   }
 }
