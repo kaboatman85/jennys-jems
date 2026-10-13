@@ -30,18 +30,10 @@ function nTypesFor(level: number): number {
   return 7;
 }
 
-/** One new special introduced at a time, consistent with the "ramp one mechanic
- * at a time" curve guidance; Laser and Bomb (the two simplest/most common
- * shapes) unlock together. */
-function enabledSpecialsFor(level: number): Set<SpecialKind> {
-  const s = new Set<SpecialKind>();
-  if (level >= 6) {
-    s.add('laser');
-    s.add('bomb');
-  }
-  if (level >= 15) s.add('hypercube');
-  if (level >= 25) s.add('star');
-  return s;
+/** All specials are available from level 1 -- there's no tutorial ramp gating
+ * them in anymore (matches Endless mode, which never gated them either). */
+function enabledSpecialsFor(): Set<SpecialKind> {
+  return new Set<SpecialKind>(['laser', 'bomb', 'hypercube', 'star']);
 }
 
 function cornerBlockMask(rows: number, cols: number, blockSize: number): Mask {
@@ -212,7 +204,7 @@ export function generateLevel(level: number): LevelConfig {
 
   const [rows, cols] = rowsColsFor(level);
   const nTypes = nTypesFor(level);
-  const enabledSpecials = enabledSpecialsFor(level);
+  const enabledSpecials = enabledSpecialsFor();
   const mask = maskFor(level, rows, cols, rng);
   const kinds = objectiveKindsFor(level);
 
