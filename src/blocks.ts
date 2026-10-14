@@ -24,10 +24,18 @@ export interface Shape {
 export interface Piece {
   shape: Shape;
   color: number;
+  /** Indices into shape.cells of the blocks that carry a jewel (collected when their line clears). */
+  jewels: number[];
 }
 
-/** null = empty, otherwise the color index of the block sitting there. */
-export type BlockGrid = (number | null)[][];
+/** One placed block: its color, and whether it is a jewel crate. */
+export interface BlockCell {
+  color: number;
+  jewel: boolean;
+}
+
+/** null = empty. */
+export type BlockGrid = (BlockCell | null)[][];
 
 function shape(id: string, tier: 1 | 2 | 3 | 4, ...rows: string[]): Shape {
   const cells: Array<readonly [number, number]> = [];
@@ -140,6 +148,7 @@ export function findFullLines(grid: BlockGrid): { rows: number[]; cols: number[]
 
 export interface ClearedCell extends Pos {
   color: number;
+  jewel: boolean;
 }
 
 export interface MoveResult {
@@ -148,6 +157,8 @@ export interface MoveResult {
   cols: number[];
   /** Cells wiped by this move (an intersection of a row and column counts once). */
   cleared: ClearedCell[];
+  /** How many of the cleared cells were jewels. */
+  jewels: number;
   points: number;
   /** Consecutive moves that cleared at least one line, including this one. */
   streak: number;
@@ -161,7 +172,9 @@ export function scoreMove(placed: number, lines: number, streak: number): number
 
 /** Places the piece, clears any full lines, and reports what happened. Caller must check canPlace first. */
 export function applyMove(grid: BlockGrid, piece: Piece, r: number, c: number, prevStreak: number): MoveResult {
-  for (const [dr, dc] of piece.shape.cells) grid[r + dr]![c + dc] = piece.color;
+  piece.shape.cells.forEach(([dr, dc], i) => {
+    grid[r + dr]![c + dc] = { color: piece.color, jewel: piece.jewels.includes(i) };
+  });
   const { rows, cols } = findFullLines(grid);
   const seen = new Set<number>();
   const cleared: ClearedCell[] = [];
@@ -169,7 +182,8 @@ export function applyMove(grid: BlockGrid, piece: Piece, r: number, c: number, p
     const key = rr * BLOCK_SIZE + cc;
     if (seen.has(key)) return;
     seen.add(key);
-    cleared.push({ r: rr, c: cc, color: grid[rr]![cc]! });
+    const cell = grid[rr]![cc]!;
+    cleared.push({ r: rr, c: cc, color: cell.color, jewel: cell.jewel });
   };
   for (const rr of rows) for (let cc = 0; cc < BLOCK_SIZE; cc++) take(rr, cc);
   for (const cc of cols) for (let rr = 0; rr < BLOCK_SIZE; rr++) take(rr, cc);
@@ -181,6 +195,7 @@ export function applyMove(grid: BlockGrid, piece: Piece, r: number, c: number, p
     rows,
     cols,
     cleared,
+    jewels: cleared.filter((p) => p.jewel).length,
     points: scoreMove(piece.shape.cells.length, lines, streak),
     streak,
   };
@@ -194,12 +209,13 @@ export function stageFor(score: number): number {
 type Tier = 1 | 2 | 3 | 4;
 
 /** Share of the tray draw that each tier gets at a given stage. Medium and large
- * pieces are in the mix from the very first stage; jumbo pieces join at stage 1. */
+ * pieces are in the mix from stage 0, jumbo pieces from stage 1. Negative stages
+ * (used by the early jewel levels) lean heavily on small pieces and drop the big ones. */
 export function tierShares(stage: number): Record<Tier, number> {
   return {
     1: Math.max(0.08, 0.6 - 0.08 * stage),
-    2: Math.min(1, 0.7 + 0.06 * stage),
-    3: Math.min(1, 0.15 + 0.12 * stage),
+    2: Math.max(0, Math.min(1, 0.7 + 0.06 * stage)),
+    3: Math.max(0, Math.min(1, 0.15 + 0.12 * stage)),
     4: stage >= 1 ? Math.min(0.8, 0.1 * stage) : 0,
   };
 }
@@ -218,25 +234,41 @@ function pickShape(rng: Rng, stage: number): Shape {
   return SHAPES[0]!;
 }
 
-export function randomPiece(rng: Rng, stage: number): Piece {
-  return { shape: pickShape(rng, stage), color: Math.floor(rng() * COLOR_COUNT) };
+/** Gives a shape a color and (with probability jewelRate) one or two jewel blocks. */
+export function makePiece(rng: Rng, shape: Shape, jewelRate: number): Piece {
+  const color = Math.floor(rng() * COLOR_COUNT);
+  const jewels: number[] = [];
+  if (jewelRate > 0 && rng() < jewelRate) {
+    const want = shape.cells.length >= 6 && rng() < 0.4 ? 2 : 1;
+    while (jewels.length < want) {
+      const i = Math.floor(rng() * shape.cells.length);
+      if (!jewels.includes(i)) jewels.push(i);
+    }
+  }
+  return { shape, color, jewels };
+}
+
+export function randomPiece(rng: Rng, stage: number, jewelRate = 0): Piece {
+  return makePiece(rng, pickShape(rng, stage), jewelRate);
 }
 
 /** Stages below this always deal a tray with at least one piece that can be placed. */
 export const FAIR_TRAY_BELOW_STAGE = 4;
 
-export function nextTray(grid: BlockGrid, rng: Rng, stage: number): Piece[] {
+/** forceFair guarantees a playable tray regardless of stage (used for the opening tray of a level). */
+export function nextTray(grid: BlockGrid, rng: Rng, stage: number, jewelRate = 0, forceFair = false): Piece[] {
+  const fair = forceFair || stage < FAIR_TRAY_BELOW_STAGE;
   let tray: Piece[] = [];
   for (let attempt = 0; attempt < 30; attempt++) {
-    tray = Array.from({ length: TRAY_SIZE }, () => randomPiece(rng, stage));
-    if (stage >= FAIR_TRAY_BELOW_STAGE) return tray;
+    tray = Array.from({ length: TRAY_SIZE }, () => randomPiece(rng, stage, jewelRate));
+    if (!fair) return tray;
     if (anyMoves(grid, tray)) return tray;
   }
   // Rerolling kept missing (a nearly full board): force one piece that does fit.
   const fitting = SHAPES.filter((s) => canPlaceAnywhere(grid, s));
   if (fitting.length > 0) {
     const forced = fitting[Math.floor(rng() * fitting.length)]!;
-    tray[0] = { shape: forced, color: Math.floor(rng() * COLOR_COUNT) };
+    tray[0] = makePiece(rng, forced, jewelRate);
   }
   return tray;
 }

@@ -52,21 +52,29 @@
         </div>
       </main>
 
+      <main id="screen-blocks-menu" class="screen hidden">
+        <div class="levels-toolbar">
+          <button class="btn menu" id="blocks-menu-home-btn" type="button">홈 <span class="en">Home</span></button>
+          <button class="btn" id="blocks-menu-endless-btn" type="button">엔드리스 <span class="en">Endless</span></button>
+        </div>
+        <div id="blocks-levels-grid" class="levels-grid" role="list"></div>
+      </main>
+
       <main id="screen-blocks" class="screen hidden">
         <div class="blocks-hud">
           <div class="pill compact" id="blocks-pill-score">
-            <span class="kr">점수</span>
-            <span class="en">Score</span>
+            <span class="kr" id="blocks-score-kr">점수</span>
+            <span class="en" id="blocks-score-en">Score</span>
             <span class="val" id="blocks-score">0</span>
           </div>
           <div class="pill compact" id="blocks-pill-stage">
-            <span class="kr">단계</span>
-            <span class="en">Stage</span>
+            <span class="kr" id="blocks-stage-kr">단계</span>
+            <span class="en" id="blocks-stage-en">Stage</span>
             <span class="val" id="blocks-stage">1</span>
           </div>
           <div class="pill compact" id="blocks-pill-best">
-            <span class="kr">최고</span>
-            <span class="en">Best</span>
+            <span class="kr" id="blocks-best-kr">최고</span>
+            <span class="en" id="blocks-best-en">Best</span>
             <span class="val" id="blocks-best">0</span>
           </div>
         </div>
@@ -104,7 +112,8 @@
         <p id="blocks-end-detail"></p>
         <div class="overlay-actions">
           <button class="btn menu" id="blocks-end-menu-btn" type="button">목록 <span class="en">Menu</span></button>
-          <button class="btn" id="blocks-end-again-btn" type="button">다시 <span class="en">Again</span></button>
+          <button class="btn sound" id="blocks-end-again-btn" type="button">다시 <span class="en">Again</span></button>
+          <button class="btn hidden" id="blocks-end-next-btn" type="button">다음 <span class="en">Next</span></button>
         </div>
       </div>
     </div>

@@ -15,6 +15,8 @@ import {
   stageFor,
 } from './blocks.ts';
 import type { BlockGrid, ClearedCell, Piece } from './blocks.ts';
+import { buildBlockLevelGrid } from './blocks-levels.ts';
+import type { BlockLevelConfig } from './blocks-levels.ts';
 import { GEM_DEFS } from './gems.ts';
 import { roundRectPath } from './board-render.ts';
 import { ParticleSystem } from './particles.ts';
@@ -35,6 +37,9 @@ export interface BlockHooks {
   /** Board rectangle in CSS px relative to the canvas, so the page can place decoration around it. */
   onLayout(rect: BlockRect): void;
   onGameOver(result: { score: number; best: number; newBest: boolean }): void;
+  /** Level mode: how many jewels are collected out of the goal. */
+  onJewels(collected: number, goal: number): void;
+  onLevelEnd(result: { won: boolean; score: number; jewels: number; goal: number }): void;
 }
 
 const BEST_KEY = 'jj.blocks.best';
@@ -58,8 +63,69 @@ function baseColor(color: number): string {
   return GEM_DEFS[color % GEM_DEFS.length]!.base;
 }
 
-/** A beveled, gem-toned square. */
-function drawBlock(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: number): void {
+const JEWEL_BURST = '#36c6ff';
+
+/** A tan crate with a cyan diamond in it: collected when its row or column clears. */
+function drawJewelCrate(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const inset = size * 0.045;
+  const s = size - 2 * inset;
+  const radius = size * 0.17;
+  const grad = ctx.createLinearGradient(x, y, x + size, y + size);
+  grad.addColorStop(0, '#fbe6bd');
+  grad.addColorStop(0.5, '#efcd8f');
+  grad.addColorStop(1, '#cf9a55');
+  roundRectPath(ctx, x + inset, y + inset, s, s, radius);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, size * 0.04);
+  ctx.strokeStyle = '#9c6a2b';
+  ctx.stroke();
+
+  const bevel = size * 0.13;
+  roundRectPath(ctx, x + inset + bevel, y + inset + bevel, s - 2 * bevel, s - 2 * bevel, radius * 0.6);
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fill();
+
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const d = size * 0.27;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - d);
+  ctx.lineTo(cx + d, cy);
+  ctx.lineTo(cx, cy + d);
+  ctx.lineTo(cx - d, cy);
+  ctx.closePath();
+  const gem = ctx.createLinearGradient(cx - d, cy - d, cx + d, cy + d);
+  gem.addColorStop(0, '#c4f6ff');
+  gem.addColorStop(0.5, '#2fb9f4');
+  gem.addColorStop(1, '#0d7bc0');
+  ctx.fillStyle = gem;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, size * 0.035);
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - d);
+  ctx.lineTo(cx - d, cy);
+  ctx.lineTo(cx, cy);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fill();
+}
+
+/** A beveled, gem-toned square (or a jewel crate). */
+function drawBlock(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  color: number,
+  jewel = false,
+): void {
+  if (jewel) {
+    drawJewelCrate(ctx, x, y, size);
+    return;
+  }
   const base = baseColor(color);
   const inset = size * 0.045;
   const s = size - 2 * inset;
@@ -109,6 +175,9 @@ export class BlockGame {
   private streak = 0;
   private stage = 0;
   private over = false;
+  private mode: 'endless' | 'level' = 'endless';
+  private level: BlockLevelConfig | null = null;
+  private jewelsCollected = 0;
   private rng: Rng = mulberry32((Date.now() ^ 0x5bd1e995) >>> 0);
   private gen = 0;
 
@@ -146,6 +215,9 @@ export class BlockGame {
 
   newGame(): void {
     this.gen++;
+    this.mode = 'endless';
+    this.level = null;
+    this.jewelsCollected = 0;
     this.grid = createBlockGrid();
     this.score = 0;
     this.streak = 0;
@@ -160,9 +232,43 @@ export class BlockGame {
     this.hooks.onStage(this.stage);
   }
 
+  /** Starts a jewel-collecting level: pre-filled board, win by collecting the goal count. */
+  startLevel(cfg: BlockLevelConfig): void {
+    this.gen++;
+    this.mode = 'level';
+    this.level = cfg;
+    this.jewelsCollected = 0;
+    this.grid = buildBlockLevelGrid(cfg);
+    this.score = 0;
+    this.streak = 0;
+    this.stage = cfg.stage;
+    this.over = false;
+    this.fades = [];
+    this.drag = null;
+    this.particles.list = [];
+    this.tray = nextTray(this.grid, this.rng, this.stage, cfg.jewelRate, true);
+    this.dealtAt = performance.now();
+    this.hooks.onScore(this.score, this.best);
+    this.hooks.onJewels(0, cfg.goal);
+  }
+
   /** Snapshot for tests/debugging. */
-  get state(): { grid: BlockGrid; tray: Array<Piece | null>; score: number; stage: number; over: boolean } {
-    return { grid: this.grid, tray: this.tray, score: this.score, stage: this.stage, over: this.over };
+  get state(): {
+    grid: BlockGrid;
+    tray: Array<Piece | null>;
+    score: number;
+    stage: number;
+    over: boolean;
+    jewels: number;
+  } {
+    return {
+      grid: this.grid,
+      tray: this.tray,
+      score: this.score,
+      stage: this.stage,
+      over: this.over,
+      jewels: this.jewelsCollected,
+    };
   }
 
   /** Places tray piece `slot` with its top-left at (r, c). Returns false if it doesn't fit. */
@@ -174,7 +280,7 @@ export class BlockGame {
     this.tray[slot] = null;
     this.streak = res.streak;
     this.score += res.points;
-    if (this.score > this.best) {
+    if (this.mode === 'endless' && this.score > this.best) {
       this.best = this.score;
       saveJSON(BEST_KEY, this.best);
     }
@@ -185,10 +291,16 @@ export class BlockGame {
     if (lines > 0) {
       for (const cell of res.cleared) {
         this.fades.push({ ...cell, start: now });
-        this.particles.burst(cell.c, cell.r, baseColor(cell.color));
+        this.particles.burst(cell.c, cell.r, cell.jewel ? JEWEL_BURST : baseColor(cell.color));
+        if (cell.jewel) this.particles.burst(cell.c, cell.r, '#ffffff');
+      }
+      if (this.mode === 'level' && res.jewels > 0) {
+        this.jewelsCollected += res.jewels;
+        this.hooks.onJewels(this.jewelsCollected, this.level!.goal);
       }
       sfx.play(lines > 1 ? 'special' : 'match', Math.max(1, res.streak));
-      if (res.streak >= 2) this.hooks.onToast(`연속 x${res.streak}! Streak x${res.streak}`);
+      if (this.mode === 'level' && res.jewels > 0) this.hooks.onToast(`보석 +${res.jewels}! Jewels +${res.jewels}`);
+      else if (res.streak >= 2) this.hooks.onToast(`연속 x${res.streak}! Streak x${res.streak}`);
       else if (lines === 2) this.hooks.onToast('멋져요! Nice!');
       else if (lines === 3) this.hooks.onToast('대단해요! Great!');
       else if (lines >= 4) this.hooks.onToast('최고예요! Amazing!');
@@ -196,7 +308,7 @@ export class BlockGame {
       sfx.play('swap');
     }
 
-    const newStage = stageFor(this.score);
+    const newStage = this.mode === 'level' ? this.stage : stageFor(this.score);
     if (newStage > this.stage) {
       this.stage = newStage;
       this.hooks.onStage(this.stage);
@@ -204,20 +316,27 @@ export class BlockGame {
     }
 
     if (this.tray.every((p) => p === null)) {
-      this.tray = nextTray(this.grid, this.rng, this.stage);
+      this.tray = nextTray(this.grid, this.rng, this.stage, this.level?.jewelRate ?? 0);
       this.dealtAt = now;
     }
 
-    if (!anyMoves(this.grid, this.tray)) this.endGame();
+    if (this.mode === 'level' && this.jewelsCollected >= this.level!.goal) this.endGame(true);
+    else if (!anyMoves(this.grid, this.tray)) this.endGame(false);
     return true;
   }
 
-  private endGame(): void {
+  private endGame(won: boolean): void {
     this.over = true;
     const gen = this.gen;
+    const level = this.mode === 'level' ? this.level : null;
     const newBest = this.score > 0 && this.score >= this.best;
     window.setTimeout(() => {
       if (gen !== this.gen) return;
+      if (level) {
+        sfx.play(won ? 'combo' : 'invalid');
+        this.hooks.onLevelEnd({ won, score: this.score, jewels: this.jewelsCollected, goal: level.goal });
+        return;
+      }
       sfx.play('invalid');
       this.hooks.onGameOver({ score: this.score, best: this.best, newBest });
     }, 700);
@@ -379,7 +498,7 @@ export class BlockGame {
         if (canPlace(this.grid, piece.shape, r, c)) {
           ghost = { piece, r, c };
           const trial = this.grid.map((row) => row.slice());
-          for (const [dr, dc] of piece.shape.cells) trial[r + dr]![c + dc] = piece.color;
+          for (const [dr, dc] of piece.shape.cells) trial[r + dr]![c + dc] = { color: piece.color, jewel: false };
           willClear = findFullLines(trial);
         }
       }
@@ -399,7 +518,7 @@ export class BlockGame {
     for (let r = 0; r < BLOCK_SIZE; r++) {
       for (let c = 0; c < BLOCK_SIZE; c++) {
         const v = this.grid[r]![c];
-        if (v !== null && v !== undefined) drawBlock(ctx, this.ox + c * cell, this.oy + r * cell, cell, v);
+        if (v) drawBlock(ctx, this.ox + c * cell, this.oy + r * cell, cell, v.color, v.jewel);
       }
     }
 
@@ -407,15 +526,16 @@ export class BlockGame {
       const t = Math.min(1, (now - f.start) / FADE_MS);
       const size = cell * (1 - 0.7 * t);
       ctx.globalAlpha = 1 - t;
-      drawBlock(ctx, this.ox + f.c * cell + (cell - size) / 2, this.oy + f.r * cell + (cell - size) / 2, size, f.color);
+      drawBlock(ctx, this.ox + f.c * cell + (cell - size) / 2, this.oy + f.r * cell + (cell - size) / 2, size, f.color, f.jewel);
     }
     ctx.globalAlpha = 1;
 
     if (ghost) {
       ctx.globalAlpha = 0.5;
-      for (const [dr, dc] of ghost.piece.shape.cells) {
-        drawBlock(ctx, this.ox + (ghost.c + dc) * cell, this.oy + (ghost.r + dr) * cell, cell, ghost.piece.color);
-      }
+      const gp = ghost.piece;
+      gp.shape.cells.forEach(([dr, dc], i) => {
+        drawBlock(ctx, this.ox + (ghost.c + dc) * cell, this.oy + (ghost.r + dr) * cell, cell, gp.color, gp.jewels.includes(i));
+      });
       ctx.globalAlpha = 1;
     }
 
@@ -480,7 +600,9 @@ export class BlockGame {
       ctx.translate(cx, cy);
       ctx.scale(s, s);
       ctx.translate(-cx, -cy);
-      for (const [dr, dc] of piece.shape.cells) drawBlock(ctx, x + dc * size, y + dr * size, size, piece.color);
+      piece.shape.cells.forEach(([dr, dc], i) =>
+        drawBlock(ctx, x + dc * size, y + dr * size, size, piece.color, piece.jewels.includes(i)),
+      );
       ctx.restore();
     }
   }
@@ -497,7 +619,9 @@ export class BlockGame {
     ctx.shadowColor = 'rgba(80,40,20,0.35)';
     ctx.shadowBlur = this.cell * 0.35;
     ctx.shadowOffsetY = this.cell * 0.12;
-    for (const [dr, dc] of piece.shape.cells) drawBlock(ctx, left + dc * size, top + dr * size, size, piece.color);
+    piece.shape.cells.forEach(([dr, dc], i) =>
+      drawBlock(ctx, left + dc * size, top + dr * size, size, piece.color, piece.jewels.includes(i)),
+    );
     ctx.restore();
   }
 }

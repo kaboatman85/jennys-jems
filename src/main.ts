@@ -7,6 +7,8 @@ import { drawBackground } from './bg.ts';
 import { allLevelIds, generateLevel } from './levelgen.ts';
 import { isUnlocked, loadProgress, recordWin } from './levels-progress.ts';
 import { BlockGame } from './blocks-game.ts';
+import { allBlockLevelIds, generateBlockLevel } from './blocks-levels.ts';
+import { isBlockLevelUnlocked, isBlockLevelWon, loadBlockProgress, recordBlockWin } from './blocks-progress.ts';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -43,9 +45,20 @@ const blocksWrap = el<HTMLElement>('blocks-wrap');
 const blocksCanvas = el<HTMLCanvasElement>('blocks-canvas');
 const blocksFrame = el<HTMLElement>('blocks-frame');
 const blocksToast = el<HTMLElement>('blocks-toast');
-const blocksScoreEl = el<HTMLElement>('blocks-score');
-const blocksBestEl = el<HTMLElement>('blocks-best');
-const blocksStageEl = el<HTMLElement>('blocks-stage');
+// The three HUD pills read differently per mode: endless = Score/Stage/Best, level = Level/Jewels/Score.
+const blocksValA = el<HTMLElement>('blocks-score');
+const blocksValB = el<HTMLElement>('blocks-stage');
+const blocksValC = el<HTMLElement>('blocks-best');
+const blocksLabels = [
+  [el<HTMLElement>('blocks-score-kr'), el<HTMLElement>('blocks-score-en')],
+  [el<HTMLElement>('blocks-stage-kr'), el<HTMLElement>('blocks-stage-en')],
+  [el<HTMLElement>('blocks-best-kr'), el<HTMLElement>('blocks-best-en')],
+] as const;
+const screenBlocksMenu = el<HTMLElement>('screen-blocks-menu');
+const blocksLevelsGrid = el<HTMLElement>('blocks-levels-grid');
+const blocksMenuHomeBtn = el<HTMLButtonElement>('blocks-menu-home-btn');
+const blocksMenuEndlessBtn = el<HTMLButtonElement>('blocks-menu-endless-btn');
+const blocksEndNextBtn = el<HTMLButtonElement>('blocks-end-next-btn');
 const blocksBackBtn = el<HTMLButtonElement>('blocks-back-btn');
 const blocksNewBtn = el<HTMLButtonElement>('blocks-new-btn');
 const soundBlocksBtn = el<HTMLButtonElement>('sound-blocks');
@@ -87,13 +100,31 @@ const game = new Game(board, new GemSprites(), {
   },
 });
 
+type BlocksMode = 'endless' | 'level';
+let blocksMode: BlocksMode = 'endless';
+let currentBlockLevel = 1;
+
 const blocks = new BlockGame(blocksCanvas, {
   onScore(score, best) {
-    blocksScoreEl.textContent = fmt(score);
-    blocksBestEl.textContent = fmt(best);
+    if (blocksMode === 'endless') {
+      blocksValA.textContent = fmt(score);
+      blocksValC.textContent = fmt(best);
+    } else {
+      blocksValC.textContent = fmt(score);
+    }
   },
   onStage(stage) {
-    blocksStageEl.textContent = String(stage + 1);
+    if (blocksMode === 'endless') blocksValB.textContent = String(stage + 1);
+  },
+  onJewels(collected, goal) {
+    blocksValB.textContent = `${collected}/${goal}`;
+  },
+  onLevelEnd({ won, score, jewels, goal }) {
+    if (won) recordBlockWin(currentBlockLevel, score);
+    blocksEndTitle.textContent = won ? '레벨 클리어! Level Clear!' : '다음에 다시! Try Again';
+    blocksEndDetail.textContent = `보석 Jewels ${jewels}/${goal} · 점수 Score ${fmt(score)}`;
+    blocksEndNextBtn.classList.toggle('hidden', !won || currentBlockLevel >= allBlockLevelIds().length);
+    blocksEndOverlay.classList.remove('hidden');
   },
   onToast(text) {
     blocksToast.textContent = text;
@@ -112,6 +143,7 @@ const blocks = new BlockGame(blocksCanvas, {
   onGameOver({ score, best, newBest }) {
     blocksEndTitle.textContent = newBest ? '새 기록! New Best!' : '게임 오버! Game Over';
     blocksEndDetail.textContent = `점수 Score ${fmt(score)} · 최고 Best ${fmt(best)}`;
+    blocksEndNextBtn.classList.add('hidden');
     blocksEndOverlay.classList.remove('hidden');
   },
 });
@@ -170,11 +202,14 @@ function relayoutBlocks(): void {
   blocks.layout(blocksWrap.clientWidth, blocksWrap.clientHeight);
 }
 
-function showScreen(which: 'levels' | 'game' | 'blocks'): void {
+type Screen = 'levels' | 'game' | 'blocks' | 'blocks-menu';
+
+function showScreen(which: Screen): void {
   screenLevels.classList.toggle('hidden', which !== 'levels');
   screenGame.classList.toggle('hidden', which !== 'game');
   screenBlocks.classList.toggle('hidden', which !== 'blocks');
-  footerLevels.classList.toggle('hidden', which !== 'levels');
+  screenBlocksMenu.classList.toggle('hidden', which !== 'blocks-menu');
+  footerLevels.classList.toggle('hidden', which !== 'levels' && which !== 'blocks-menu');
   footerGame.classList.toggle('hidden', which !== 'game');
   footerBlocks.classList.toggle('hidden', which !== 'blocks');
   if (which === 'game') relayoutBoard();
@@ -272,28 +307,94 @@ newGameBtn.addEventListener('click', () => {
   void game.newGame();
 });
 
-function startBlocks(): void {
+function setBlocksMode(next: BlocksMode): void {
+  blocksMode = next;
+  const labels =
+    next === 'level'
+      ? [['레벨', 'Level'], ['보석', 'Jewels'], ['점수', 'Score']]
+      : [['점수', 'Score'], ['단계', 'Stage'], ['최고', 'Best']];
+  labels.forEach(([kr, en], i) => {
+    blocksLabels[i]![0].textContent = kr!;
+    blocksLabels[i]![1].textContent = en!;
+  });
+  if (next === 'level') blocksValA.textContent = String(currentBlockLevel);
+  blocksNewBtn.innerHTML = next === 'level' ? '다시 <span class="en">Retry</span>' : '새 게임';
+}
+
+function startBlocksEndless(): void {
+  setBlocksMode('endless');
   blocksEndOverlay.classList.add('hidden');
   blocks.newGame();
   showScreen('blocks');
 }
+
+function launchBlockLevel(id: number): void {
+  currentBlockLevel = id;
+  setBlocksMode('level');
+  blocksEndOverlay.classList.add('hidden');
+  blocks.startLevel(generateBlockLevel(id));
+  showScreen('blocks');
+}
+
+function renderBlockLevelGrid(): void {
+  const progress = loadBlockProgress();
+  blocksLevelsGrid.replaceChildren();
+  for (const id of allBlockLevelIds()) {
+    const unlocked = isBlockLevelUnlocked(progress, id);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'level-btn' + (unlocked ? '' : ' locked');
+    btn.setAttribute('role', 'listitem');
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = unlocked ? String(id) : '🔒';
+    const mark = document.createElement('span');
+    mark.className = 'stars';
+    mark.textContent = unlocked && isBlockLevelWon(progress, id) ? '✓' : '';
+    btn.append(num, mark);
+    if (unlocked) {
+      btn.addEventListener('click', () => {
+        sfx.unlock();
+        launchBlockLevel(id);
+      });
+    } else {
+      btn.disabled = true;
+    }
+    blocksLevelsGrid.appendChild(btn);
+  }
+}
+
+function showBlocksMenu(): void {
+  blocksEndOverlay.classList.add('hidden');
+  renderBlockLevelGrid();
+  showScreen('blocks-menu');
+}
+
+function restartBlocks(): void {
+  sfx.unlock();
+  if (blocksMode === 'level') launchBlockLevel(currentBlockLevel);
+  else startBlocksEndless();
+}
+
 blocksBtn.addEventListener('click', () => {
   sfx.unlock();
-  startBlocks();
+  showBlocksMenu();
 });
-blocksNewBtn.addEventListener('click', () => {
+blocksMenuHomeBtn.addEventListener('click', () => {
+  renderLevelGrid();
+  showScreen('levels');
+});
+blocksMenuEndlessBtn.addEventListener('click', () => {
   sfx.unlock();
-  startBlocks();
+  startBlocksEndless();
 });
-blocksBackBtn.addEventListener('click', () => {
-  renderLevelGrid();
-  showScreen('levels');
-});
-blocksEndAgainBtn.addEventListener('click', startBlocks);
-blocksEndMenuBtn.addEventListener('click', () => {
-  blocksEndOverlay.classList.add('hidden');
-  renderLevelGrid();
-  showScreen('levels');
+blocksNewBtn.addEventListener('click', restartBlocks);
+blocksBackBtn.addEventListener('click', showBlocksMenu);
+blocksEndAgainBtn.addEventListener('click', restartBlocks);
+blocksEndMenuBtn.addEventListener('click', showBlocksMenu);
+blocksEndNextBtn.addEventListener('click', () => {
+  sfx.unlock();
+  launchBlockLevel(currentBlockLevel + 1);
 });
 
 function renderSoundButton(): void {
@@ -338,7 +439,8 @@ if (new URLSearchParams(location.search).has('debug')) {
     }
   ).__game = game;
   (window as unknown as { __blocks: BlockGame }).__blocks = blocks;
-  (window as unknown as { __startBlocks: () => void }).__startBlocks = startBlocks;
+  (window as unknown as { __startBlocks: () => void }).__startBlocks = startBlocksEndless;
+  (window as unknown as { __launchBlockLevel: (id: number) => void }).__launchBlockLevel = launchBlockLevel;
   (window as unknown as { __launchLevel: (id: number) => void }).__launchLevel = launchLevel;
   (window as unknown as { __generateLevel: typeof generateLevel }).__generateLevel = generateLevel;
 }
@@ -358,5 +460,14 @@ if (levelParam && /^\d+$/.test(levelParam)) {
   const id = Number(levelParam);
   if (id >= 1 && id <= allLevelIds().length) {
     requestAnimationFrame(() => launchLevel(id));
+  }
+}
+
+// ?blocklevel=N launches straight into that block-puzzle level.
+const blockLevelParam = new URLSearchParams(location.search).get('blocklevel');
+if (blockLevelParam && /^\d+$/.test(blockLevelParam)) {
+  const id = Number(blockLevelParam);
+  if (id >= 1 && id <= allBlockLevelIds().length) {
+    requestAnimationFrame(() => launchBlockLevel(id));
   }
 }

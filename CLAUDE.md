@@ -69,17 +69,21 @@ src/
                        procedural decoration); safe to delete.
   bg.ts               Page background: the owner's artwork (public/bg-mockup.jpg), cover-fit, gradient fallback.
   blocks.ts           Pure block-puzzle engine (see "Block puzzle" below).
-  blocks-game.ts      Canvas front-end for the block puzzle: drag-and-drop, preview, clear effects.
+  blocks-game.ts      Canvas front-end for the block puzzle: drag-and-drop, preview, clear effects,
+                       endless + jewel-level modes.
+  blocks-levels.ts    Pure: hand-authored 8x8 patterns + generateBlockLevel(n) for the jewel levels.
+  blocks-progress.ts  Pure, localStorage-backed unlock/best-score tracking for the jewel levels.
   audio.ts            WebAudio synthesized sound effects (no audio files). Mute persists.
   storage.ts          Guarded localStorage wrappers (loadJSON / saveJSON).
   main.ts             Wires DOM: level-select screen, game screen (endless + level mode), HUD,
                        level complete/failed overlay, ?debug and ?level=N hooks, SW registration.
   style.css           Page styling.
-tests/*.test.ts            Engine/level/specials/progress unit tests (61).
+tests/*.test.ts            Engine/level/specials/progress unit tests (95).
 tools/render-gems.ts       Gem + special-overlay contact sheet renderer.
 tools/render-icons.ts      Renders the PWA app icons from the procedural gem art.
 tools/solve-levels.ts      Headless random/greedy bot solver -- win-rate estimates per level,
                            used to tune the difficulty curve in levelgen.ts.
+tools/solve-block-levels.ts  Same idea for the block puzzle's jewel levels (greedy/random bots).
 tools/playtest.py          Playwright end-to-end playtest.
 public/manifest.webmanifest, public/icons/, public/sw.js   PWA: installable + offline app shell.
 ```
@@ -139,7 +143,8 @@ only -- real browsers run rAF normally.
 ### localStorage keys
 
 `jj.muted` (boolean), `jj.best` (number), `jj.levels` (`Record<levelId, {stars, bestScore}>`, written by
-`levels-progress.ts`). Use the same `jj.` prefix for new keys. Always go through `storage.ts`; localStorage
+`levels-progress.ts`), `jj.blocks.best` (number), `jj.blocks.levels` (`Record<levelId, {bestScore}>`, written by
+`blocks-progress.ts`). Use the same `jj.` prefix for new keys. Always go through `storage.ts`; localStorage
 can throw or be empty (private mode).
 
 ## Milestone 2: special pieces (as built)
@@ -219,9 +224,31 @@ tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no t
 - **Storage:** `jj.blocks.best`. A game in progress is not saved (leaving to the menu abandons it).
 - **Test hooks:** with `?debug`, `window.__blocks` (`.state`, `.tryPlace(slot, r, c)`, `.step(now)` to pump a
   frame) and `window.__startBlocks()`.
-- **Ideas not built yet:** a proper home hub instead of a button on the level screen, saved in-progress
-  games, more stage-driven difficulty (pre-filled junk cells, fewer fair trays), sound beyond reusing the
-  match-game effects, and a block level map like the gem game's.
+### Jewel levels (block puzzle)
+
+Home -> Blocks opens a menu (`#screen-blocks-menu`: Home / Endless buttons + a 65-level grid). A level starts
+from a pre-filled pattern with some **jewel crates** (tan block, cyan diamond) already in it; tray pieces
+sometimes carry jewels too. **Clearing a row or column that contains a jewel collects it**; collect the goal
+count to win. You lose when no tray piece fits. Level N unlocks when N-1 is won.
+
+- **Cells and pieces:** `BlockGrid` cells are `{color, jewel}`; a `Piece` has `jewels: number[]` (indices into
+  `shape.cells`). `applyMove` reports `jewels` collected; the intersection of a cleared row and column counts once.
+- **Levels (`blocks-levels.ts`):** 13 hand-drawn patterns (tree from the reference screenshot, cross, heart,
+  ...) x 5 variants (flips/transpose) = 65 levels, lightest pattern first in each cycle. **Every pattern must keep
+  a gap in every row and column** (a test enforces it) or the level opens with a free clear. Goal, extra clutter,
+  how often dealt pieces carry jewels, and the piece-mix stage are all generated from the level number.
+- **Piece mix for levels:** `tierShares` accepts *negative* stages. Levels start at `STAGE_FLOOR` (-4: almost
+  all small pieces, no big or jumbo ones) and creep up by 1 every 12 levels. Reusing the endless mix (which
+  hands out large pieces from stage 0) made the levels near-unwinnable -- measured, not guessed.
+- **Difficulty tuning:** run `node tools/solve-block-levels.ts [runs] [random|greedy|both]`. Current greedy-bot
+  win rate by band of 10 levels: ~85% / 73% / 56% / 33% / 39% / 14% / 5%. A person who plans ahead should do
+  much better than the bot, but if the last levels feel brutal, lower the late-level goals or pieces first.
+- **HUD:** the same three pills relabel per mode (endless: Score/Stage/Best; level: Level/Jewels x/y/Score);
+  `main.ts` routes the hooks by `blocksMode`. The 'Retry' footer button replaces 'New game' in level mode.
+- **Test hooks:** `window.__launchBlockLevel(id)` (with `?debug`), and `?blocklevel=N` launches a level directly.
+- **Ideas not built yet:** stars/par scoring for levels, a proper home hub instead of a button on the level
+  screen, saved in-progress games, pre-filled junk cells in endless mode, locked crates / other obstacle
+  types, and sound beyond reusing the match-game effects.
 
 ## Known gaps / tech debt
 
