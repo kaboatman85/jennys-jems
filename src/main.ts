@@ -6,7 +6,7 @@ import { sfx } from './audio.ts';
 import { drawBackground } from './bg.ts';
 import { allLevelIds, generateLevel } from './levelgen.ts';
 import { isUnlocked, loadProgress, recordWin } from './levels-progress.ts';
-import { BlockGame } from './blocks-game.ts';
+import { BlockGame, drawBlock } from './blocks-game.ts';
 import { allBlockLevelIds, generateBlockLevel } from './blocks-levels.ts';
 import { isBlockLevelUnlocked, isBlockLevelWon, loadBlockProgress, recordBlockWin } from './blocks-progress.ts';
 
@@ -38,7 +38,10 @@ const levelEndDetail = el<HTMLElement>('level-end-detail');
 const overlayMenuBtn = el<HTMLButtonElement>('overlay-menu-btn');
 const overlayRetryBtn = el<HTMLButtonElement>('overlay-retry-btn');
 const overlayNextBtn = el<HTMLButtonElement>('overlay-next-btn');
-const blocksBtn = el<HTMLButtonElement>('blocks-btn');
+const screenHome = el<HTMLElement>('screen-home');
+const homeGemsBtn = el<HTMLButtonElement>('home-gems-btn');
+const homeBlocksBtn = el<HTMLButtonElement>('home-blocks-btn');
+const gemsHomeBtn = el<HTMLButtonElement>('gems-home-btn');
 const screenBlocks = el<HTMLElement>('screen-blocks');
 const footerBlocks = el<HTMLElement>('footer-blocks');
 const blocksWrap = el<HTMLElement>('blocks-wrap');
@@ -74,7 +77,8 @@ type Mode = 'endless' | 'level';
 let mode: Mode = 'endless';
 let currentLevelId = 1;
 
-const game = new Game(board, new GemSprites(), {
+const gemSprites = new GemSprites();
+const game = new Game(board, gemSprites, {
   onScore(score, best) {
     scoreEl.textContent = fmt(score);
     if (mode === 'endless') bestEl.textContent = fmt(best);
@@ -202,14 +206,15 @@ function relayoutBlocks(): void {
   blocks.layout(blocksWrap.clientWidth, blocksWrap.clientHeight);
 }
 
-type Screen = 'levels' | 'game' | 'blocks' | 'blocks-menu';
+type Screen = 'home' | 'levels' | 'game' | 'blocks' | 'blocks-menu';
 
 function showScreen(which: Screen): void {
+  screenHome.classList.toggle('hidden', which !== 'home');
   screenLevels.classList.toggle('hidden', which !== 'levels');
   screenGame.classList.toggle('hidden', which !== 'game');
   screenBlocks.classList.toggle('hidden', which !== 'blocks');
   screenBlocksMenu.classList.toggle('hidden', which !== 'blocks-menu');
-  footerLevels.classList.toggle('hidden', which !== 'levels' && which !== 'blocks-menu');
+  footerLevels.classList.toggle('hidden', which !== 'home' && which !== 'levels' && which !== 'blocks-menu');
   footerGame.classList.toggle('hidden', which !== 'game');
   footerBlocks.classList.toggle('hidden', which !== 'blocks');
   if (which === 'game') relayoutBoard();
@@ -376,14 +381,7 @@ function restartBlocks(): void {
   else startBlocksEndless();
 }
 
-blocksBtn.addEventListener('click', () => {
-  sfx.unlock();
-  showBlocksMenu();
-});
-blocksMenuHomeBtn.addEventListener('click', () => {
-  renderLevelGrid();
-  showScreen('levels');
-});
+blocksMenuHomeBtn.addEventListener('click', () => showScreen('home'));
 blocksMenuEndlessBtn.addEventListener('click', () => {
   sfx.unlock();
   startBlocksEndless();
@@ -426,8 +424,50 @@ window.addEventListener('resize', () => {
 new ResizeObserver(() => relayoutBoard()).observe(boardWrap);
 new ResizeObserver(() => relayoutBlocks()).observe(blocksWrap);
 
+/** The two cards on the landing page get small pictures drawn from each game's own art. */
+function drawHomeIcons(): void {
+  const gemsCtx = el<HTMLCanvasElement>('home-gems-icon').getContext('2d')!;
+  const gemPx = 112;
+  [
+    { type: 0, x: 8, y: 44 },
+    { type: 3, x: 124, y: 22 },
+    { type: 2, x: 240, y: 44 },
+  ].forEach(({ type, x, y }) => gemsCtx.drawImage(gemSprites.get(type, gemPx), x, y, gemPx, gemPx));
+
+  const blocksCtx = el<HTMLCanvasElement>('home-blocks-icon').getContext('2d')!;
+  const cell = 54;
+  const ox = 18;
+  const oy = 9;
+  const cells: Array<[number, number, number, boolean]> = [
+    [0, 0, 4, false],
+    [0, 1, 4, false],
+    [0, 2, 4, false],
+    [1, 0, 4, false],
+    [2, 0, 4, false],
+    [1, 1, 0, true],
+    [0, 4, 1, false],
+    [0, 5, 1, false],
+    [1, 4, 6, false],
+    [1, 5, 6, true],
+    [2, 4, 6, false],
+    [2, 5, 6, false],
+  ];
+  for (const [r, c, color, jewel] of cells) drawBlock(blocksCtx, ox + c * cell, oy + r * cell, cell, color, jewel);
+}
+
 relayoutBg();
 renderLevelGrid();
+drawHomeIcons();
+homeGemsBtn.addEventListener('click', () => {
+  sfx.unlock();
+  renderLevelGrid();
+  showScreen('levels');
+});
+homeBlocksBtn.addEventListener('click', () => {
+  sfx.unlock();
+  showBlocksMenu();
+});
+gemsHomeBtn.addEventListener('click', () => showScreen('home'));
 
 // ?debug exposes the game for automated testing, plus level helpers.
 if (new URLSearchParams(location.search).has('debug')) {

@@ -51,6 +51,7 @@ header {
   padding: 10px 12px 2px;
 }
 
+#screen-home,
 #screen-levels,
 #screen-game,
 #screen-blocks,
@@ -264,6 +265,131 @@ footer {
 
 .screen {
   min-height: 0;
+}
+
+/* Home: pick a game */
+#screen-home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2.5vh, 24px);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 14px 8px;
+}
+
+.home-prompt {
+  margin: 0;
+  text-align: center;
+  font-weight: 800;
+  font-size: clamp(16px, 4vw, 24px);
+  color: var(--pink-dark);
+}
+
+.home-prompt .en,
+.home-sub .en {
+  display: block;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.home-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(12px, 3vw, 28px);
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
+}
+
+.home-card {
+  font: inherit;
+  flex: 1 1 240px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 16px 16px;
+  background: rgba(255, 246, 232, 0.94);
+  border: 4px solid var(--gold);
+  border-radius: 30px;
+  box-shadow: 0 5px 0 rgba(201, 148, 58, 0.5), 0 12px 22px rgba(120, 80, 30, 0.22);
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.home-card:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 rgba(201, 148, 58, 0.5);
+}
+
+.home-icon {
+  width: min(62%, 220px);
+  height: auto;
+  max-height: 22vh;
+  object-fit: contain;
+}
+
+.home-text {
+  display: contents;
+}
+
+.home-title {
+  font-weight: 900;
+  font-size: clamp(24px, 6vw, 36px);
+  line-height: 1.1;
+  color: var(--pink-dark);
+}
+
+.home-title .en {
+  margin-left: 6px;
+  font-size: 0.8em;
+}
+
+.home-sub {
+  font-weight: 800;
+  font-size: clamp(13px, 3.2vw, 17px);
+  line-height: 1.25;
+  text-align: center;
+}
+
+/* Narrow/portrait: cards become compact rows (picture left, text right) so both fit without scrolling. */
+@media (max-width: 760px) {
+  .home-cards {
+    flex-direction: column;
+    align-items: center;
+  }
+  .home-card {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 420px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 26px;
+  }
+  .home-icon {
+    width: 44%;
+    max-height: none;
+    flex: 0 0 44%;
+  }
+  .home-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    text-align: left;
+  }
+  .home-sub {
+    text-align: left;
+  }
 }
 
 /* Level select */

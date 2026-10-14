@@ -114,7 +114,7 @@ function drawJewelCrate(ctx: CanvasRenderingContext2D, x: number, y: number, siz
 }
 
 /** A beveled, gem-toned square (or a jewel crate). */
-function drawBlock(
+export function drawBlock(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,

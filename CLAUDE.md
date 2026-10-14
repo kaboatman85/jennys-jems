@@ -75,7 +75,7 @@ src/
   blocks-progress.ts  Pure, localStorage-backed unlock/best-score tracking for the jewel levels.
   audio.ts            WebAudio synthesized sound effects (no audio files). Mute persists.
   storage.ts          Guarded localStorage wrappers (loadJSON / saveJSON).
-  main.ts             Wires DOM: level-select screen, game screen (endless + level mode), HUD,
+  main.ts             Wires DOM: landing page, gem level-select, game screen (endless + level mode), HUD,
                        level complete/failed overlay, ?debug and ?level=N hooks, SW registration.
   style.css           Page styling.
 tests/*.test.ts            Engine/level/specials/progress unit tests (95).
@@ -122,7 +122,7 @@ public/manifest.webmanifest, public/icons/, public/sw.js   PWA: installable + of
   the win-rate curve before committing a change. A drop item only advances when a match clears a cell
   *below it in its own column* -- that's why drop items spawn close to the bottom rather than at the top.
 - **The live game only ever plays through `game.ts`'s `newGame()` (endless) or `startLevel(config)` (level
-  mode).** `main.ts` is the only caller; it owns screen switching (level-select vs. game), the HUD (pills +
+  mode).** `main.ts` is the only caller; it owns screen switching (home / level-select / game / blocks menu / blocks), the HUD (pills +
   objectives bar), and the win/loss overlay. Keep that separation -- game.ts has no knowledge of screens/DOM
   beyond its own canvas and hooks.
 
@@ -203,7 +203,7 @@ Logic lives in `specials.ts` (`planSpecials`, `expandActivation`, `comboActivati
 ## Block puzzle (second game, added after Milestone 5)
 
 A Block Blast / 1010!-style game that lives inside the app as its own screen (`#screen-blocks`), opened
-from the "블록 Blocks" button next to Endless on the level-select screen. Drag one of three pieces from the
+from the "블록 Blocks" card on the landing page. Drag one of three pieces from the
 tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no tray piece fits anywhere.
 
 - **Engine (`blocks.ts`, pure, tests in `tests/blocks.test.ts`):** 42 shapes in 4 tiers (starter bars/2x2;
@@ -226,7 +226,7 @@ tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no t
   frame) and `window.__startBlocks()`.
 ### Jewel levels (block puzzle)
 
-Home -> Blocks opens a menu (`#screen-blocks-menu`: Home / Endless buttons + a 65-level grid). A level starts
+Landing page -> Blocks card opens a menu (`#screen-blocks-menu`: Home / Endless buttons + a 65-level grid). A level starts
 from a pre-filled pattern with some **jewel crates** (tan block, cyan diamond) already in it; tray pieces
 sometimes carry jewels too. **Clearing a row or column that contains a jewel collects it**; collect the goal
 count to win. You lose when no tray piece fits. Level N unlocks when N-1 is won.
@@ -249,6 +249,24 @@ count to win. You lose when no tray piece fits. Level N unlocks when N-1 is won.
 - **Ideas not built yet:** stars/par scoring for levels, a proper home hub instead of a button on the level
   screen, saved in-progress games, pre-filled junk cells in endless mode, locked crates / other obstacle
   types, and sound beyond reusing the match-game effects.
+
+## Landing page
+
+The app opens on `#screen-home`: two big cards, **Gems** (match-3, 100 levels) and **Blocks** (block puzzle).
+Gems -> the 100-level grid (`#screen-levels`, toolbar: Home / Endless); Blocks -> the block menu
+(`#screen-blocks-menu`, toolbar: Home / Endless + 65-level grid). Both toolbars' Home buttons return here.
+`showScreen()` in `main.ts` is the single switch for all five screens.
+
+- Card pictures are drawn once at startup by `drawHomeIcons()` from each game's own art (`GemSprites` gems;
+  `drawBlock` exported from `blocks-game.ts` for the block shapes and a jewel crate), so they can't drift
+  from the in-game look.
+- Layout: side-by-side cards on wide screens; at <=760px they become compact picture-left/text-right rows so
+  both fit on a short phone with no scrolling (checked at 390x640 and 412x740).
+- The ?level=N / ?blocklevel=N deep links still skip the landing page. Not re-verified after this change in
+  the automation browser because requestAnimationFrame stalls there (see the Automation note); the code path
+  (rAF -> launch fn -> showScreen) was not touched.
+- Ideas not built yet: remember the last-played game, a "continue" shortcut, per-game progress on the cards
+  (levels cleared / best score), and phone Back-button handling between screens.
 
 ## Known gaps / tech debt
 

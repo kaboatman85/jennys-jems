@@ -20,10 +20,30 @@
         <p class="subtitle"><span class="deco">〜</span> 제니의 보석 <span class="deco">〜</span></p>
       </header>
 
-      <main id="screen-levels" class="screen">
+      <main id="screen-home" class="screen">
+        <p class="home-prompt">게임을 골라요! <span class="en">Pick a game</span></p>
+        <div class="home-cards">
+          <button class="home-card" id="home-gems-btn" type="button">
+            <canvas class="home-icon" id="home-gems-icon" width="360" height="180" aria-hidden="true"></canvas>
+            <span class="home-text">
+              <span class="home-title">보석 <span class="en">Gems</span></span>
+              <span class="home-sub">3개를 맞춰요 <span class="en">Match 3 gems &middot; 100 levels</span></span>
+            </span>
+          </button>
+          <button class="home-card" id="home-blocks-btn" type="button">
+            <canvas class="home-icon" id="home-blocks-icon" width="360" height="180" aria-hidden="true"></canvas>
+            <span class="home-text">
+              <span class="home-title">블록 <span class="en">Blocks</span></span>
+              <span class="home-sub">조각을 맞춰요 <span class="en">Fit pieces &middot; collect jewels</span></span>
+            </span>
+          </button>
+        </div>
+      </main>
+
+      <main id="screen-levels" class="screen hidden">
         <div class="levels-toolbar">
+          <button class="btn menu" id="gems-home-btn" type="button">홈 <span class="en">Home</span></button>
           <button class="btn" id="endless-btn" type="button">엔드리스 <span class="en">Endless</span></button>
-          <button class="btn sound" id="blocks-btn" type="button">블록 <span class="en">Blocks</span></button>
         </div>
         <div id="levels-grid" class="levels-grid" role="list"></div>
       </main>
