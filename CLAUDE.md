@@ -199,7 +199,7 @@ Logic lives in `specials.ts` (`planSpecials`, `expandActivation`, `comboActivati
 
 A Block Blast / 1010!-style game that lives inside the app as its own screen (`#screen-blocks`), opened
 from the "블록 Blocks" button next to Endless on the level-select screen. Drag one of three pieces from the
-tray onto a 7x7 grid; full rows/columns clear. No rotation. Game over when no tray piece fits anywhere.
+tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no tray piece fits anywhere.
 
 - **Engine (`blocks.ts`, pure, tests in `tests/blocks.test.ts`):** 42 shapes in 4 tiers (starter bars/2x2;
   4-bars, small L, 2x3; 5-bars, big L, T, S/Z, 3x3, plus, U, 2x4; jumbo 3x4/4x3 blocks and 4-arm corners).
@@ -208,8 +208,9 @@ tray onto a 7x7 grid; full rows/columns clear. No rotation. Game over when no tr
   first stage, jumbo pieces from stage 1 (HUD stage 2), and starter pieces thin out over time. Below
   `FAIR_TRAY_BELOW_STAGE` (4) a tray always contains a placeable piece (`nextTray`, with a forced-fit
   fallback); from stage 4 up it doesn't, which is the difficulty. Tune difficulty in `tierShares`; a greedy
-  bot (clear-seeking, one-ply) lasts a median ~14 moves on the current mix vs ~32 on the original 8x8
-  easy-start version, so a more-than-2x jump -- ease it back there if play-testing says it's too harsh.
+  bot (clear-seeking, one-ply) lasts a median ~17 moves on the current mix vs ~32 on the original
+  easy-start version (it was ~14 when the board was briefly 7x7, so piece mix matters more than board size).
+  Ease it back toward the original if play-testing says it's too harsh.
 - **Scoring:** 1 per block placed, 10 x lines^2 per clear, +20 per extra move in a clearing streak.
 - **Front-end (`blocks-game.ts`):** one canvas holds board + tray. Held piece floats ~0.9 cell above the
   finger and snaps to the nearest grid position; a translucent ghost shows where it lands and rows/columns

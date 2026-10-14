@@ -1,11 +1,11 @@
-// Pure engine for the block-fitting puzzle: a 7x7 grid, a tray of three pieces,
+// Pure engine for the block-fitting puzzle: an 8x8 grid, a tray of three pieces,
 // full rows/columns clear. No DOM, no rendering. Difficulty is a "stage" derived
 // from score; higher stages unlock bigger/awkward shapes and stop guaranteeing
 // that the tray has a playable piece.
 
 import type { Pos, Rng } from './board.ts';
 
-export const BLOCK_SIZE = 7;
+export const BLOCK_SIZE = 8;
 export const TRAY_SIZE = 3;
 export const MAX_STAGE = 10;
 export const COLOR_COUNT = 7;
@@ -88,7 +88,7 @@ export const SHAPES: Shape[] = [
   shape('r24', 3, '####', '####'),
   shape('r42', 3, '##', '##', '##', '##'),
 
-  // Tier 4: jumbo pieces that take up a big share of a 7x7 board.
+  // Tier 4: jumbo pieces that take up a big share of the board.
   shape('r34', 4, '####', '####', '####'),
   shape('r43', 4, '###', '###', '###', '###'),
   shape('l7-a', 4, '####', '#...', '#...', '#...'),
