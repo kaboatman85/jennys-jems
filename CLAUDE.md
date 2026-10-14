@@ -240,9 +240,12 @@ count to win. You lose when no tray piece fits. Level N unlocks when N-1 is won.
 - **Piece mix for levels:** `tierShares` accepts *negative* stages. Levels start at `STAGE_FLOOR` (-4: almost
   all small pieces, no big or jumbo ones) and creep up by 1 every 12 levels. Reusing the endless mix (which
   hands out large pieces from stage 0) made the levels near-unwinnable -- measured, not guessed.
-- **Difficulty tuning:** run `node tools/solve-block-levels.ts [runs] [random|greedy|both]`. Current greedy-bot
-  win rate by band of 10 levels: ~85% / 73% / 56% / 33% / 39% / 14% / 5%. A person who plans ahead should do
-  much better than the bot, but if the last levels feel brutal, lower the late-level goals or pieces first.
+- **Difficulty tuning:** run `node tools/solve-block-levels.ts [runs] [random|greedy|both]`. The goal is
+  `20 + 0.22 * level` (20 at level 1, 34 at level 65) -- the owner asked for the early levels to start around
+  20 jewels. Greedy-bot win rate by band of 10 levels is ~42% / 27% / 21% / 11% / 14% / 2% / 0%, taking ~28
+  pieces per win early on (it was ~85% and ~11 pieces when the level-1 goal was 5). The bot is one-ply, so a
+  person who plans ahead should do much better; if the last levels feel brutal in play-testing, lower the
+  slope of the goal first, then slow the piece-mix creep (`STAGE_FLOOR` + 1 per 12 levels).
 - **HUD:** the same three pills relabel per mode (endless: Score/Stage/Best; level: Level/Jewels x/y/Score);
   `main.ts` routes the hooks by `blocksMode`. The 'Retry' footer button replaces 'New game' in level mode.
 - **Test hooks:** `window.__launchBlockLevel(id)` (with `?debug`), and `?blocklevel=N` launches a level directly.

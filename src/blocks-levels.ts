@@ -162,7 +162,7 @@ export function generateBlockLevel(n: number): BlockLevelConfig {
     name: `${template.name} ${n}`,
     layout: grid.map((r) => r.join('')),
     color: template.color,
-    goal: Math.round(5 + n * 0.28),
+    goal: Math.round(20 + n * 0.22),
     jewelRate: Math.max(0.6, 0.95 - 0.005 * n),
     stage: Math.min(MAX_STAGE - 2, STAGE_FLOOR + Math.floor((n - 1) / 12)),
     seed: n,
