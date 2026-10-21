@@ -5,10 +5,10 @@ import { GemSprites, GEM_DEFS } from './gems.ts';
 import { sfx } from './audio.ts';
 import { drawBackground } from './bg.ts';
 import { allLevelIds, generateLevel } from './levelgen.ts';
-import { isUnlocked, loadProgress, recordWin } from './levels-progress.ts';
+import { loadProgress, recordWin } from './levels-progress.ts';
 import { BlockGame, drawBlock } from './blocks-game.ts';
 import { allBlockLevelIds, generateBlockLevel } from './blocks-levels.ts';
-import { isBlockLevelUnlocked, isBlockLevelWon, loadBlockProgress, recordBlockWin } from './blocks-progress.ts';
+import { isBlockLevelWon, loadBlockProgress, recordBlockWin } from './blocks-progress.ts';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -230,28 +230,23 @@ function renderLevelGrid(): void {
   const progress = loadProgress();
   levelsGrid.replaceChildren();
   for (const id of allLevelIds()) {
-    const unlocked = isUnlocked(progress, id);
     const record = progress[id];
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'level-btn' + (unlocked ? '' : ' locked');
+    btn.className = 'level-btn';
     btn.setAttribute('role', 'listitem');
     const num = document.createElement('span');
     num.className = 'num';
-    num.textContent = unlocked ? String(id) : '🔒';
+    num.textContent = String(id);
     const stars = document.createElement('span');
     stars.className = 'stars';
     const earned = record?.stars ?? 0;
-    stars.textContent = unlocked ? '★'.repeat(earned) + '☆'.repeat(3 - earned) : '';
+    stars.textContent = '★'.repeat(earned) + '☆'.repeat(3 - earned);
     btn.append(num, stars);
-    if (unlocked) {
-      btn.addEventListener('click', () => {
-        sfx.unlock();
-        launchLevel(id);
-      });
-    } else {
-      btn.disabled = true;
-    }
+    btn.addEventListener('click', () => {
+      sfx.unlock();
+      launchLevel(id);
+    });
     levelsGrid.appendChild(btn);
   }
 }
@@ -345,26 +340,21 @@ function renderBlockLevelGrid(): void {
   const progress = loadBlockProgress();
   blocksLevelsGrid.replaceChildren();
   for (const id of allBlockLevelIds()) {
-    const unlocked = isBlockLevelUnlocked(progress, id);
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'level-btn' + (unlocked ? '' : ' locked');
+    btn.className = 'level-btn';
     btn.setAttribute('role', 'listitem');
     const num = document.createElement('span');
     num.className = 'num';
-    num.textContent = unlocked ? String(id) : '🔒';
+    num.textContent = String(id);
     const mark = document.createElement('span');
     mark.className = 'stars';
-    mark.textContent = unlocked && isBlockLevelWon(progress, id) ? '✓' : '';
+    mark.textContent = isBlockLevelWon(progress, id) ? '✓' : '';
     btn.append(num, mark);
-    if (unlocked) {
-      btn.addEventListener('click', () => {
-        sfx.unlock();
-        launchBlockLevel(id);
-      });
-    } else {
-      btn.disabled = true;
-    }
+    btn.addEventListener('click', () => {
+      sfx.unlock();
+      launchBlockLevel(id);
+    });
     blocksLevelsGrid.appendChild(btn);
   }
 }

@@ -1,5 +1,5 @@
-// Which block-puzzle levels are beaten, plus the best score on each. Level N
-// unlocks once level N-1 has been won. Goes through storage.ts like everything else.
+// Which block-puzzle levels are beaten, plus the best score on each.
+// Goes through storage.ts like everything else.
 
 import { loadJSON, saveJSON } from './storage.ts';
 
@@ -13,10 +13,6 @@ const KEY = 'jj.blocks.levels';
 
 export function loadBlockProgress(): BlockProgress {
   return loadJSON<BlockProgress>(KEY, {});
-}
-
-export function isBlockLevelUnlocked(progress: BlockProgress, id: number): boolean {
-  return id <= 1 || progress[id - 1] !== undefined;
 }
 
 export function isBlockLevelWon(progress: BlockProgress, id: number): boolean {

@@ -57,7 +57,7 @@ src/
   level.ts            Pure level state: objectives, move limit, win/loss (LevelConfig/LevelState).
   levelgen.ts         generateLevel(n) -- deterministically builds all 100 LevelConfigs from
                        tunable difficulty parameters, seeded per level.
-  levels-progress.ts  Pure, localStorage-backed star ratings and unlock progression.
+  levels-progress.ts  Pure, localStorage-backed star ratings.
   gems.ts             Procedural 3D gem drawing (drawGem) + sprite caches (gem/special/obstacle/
                        drop-item overlays). Behind the GemArt/OverlayArt/ObstacleArt interfaces.
   game.ts             The Game class: layout, pre-rendered frame, tween/animation engine, resolve
@@ -72,7 +72,7 @@ src/
   blocks-game.ts      Canvas front-end for the block puzzle: drag-and-drop, preview, clear effects,
                        endless + jewel-level modes.
   blocks-levels.ts    Pure: hand-authored 8x8 patterns + generateBlockLevel(n) for the jewel levels.
-  blocks-progress.ts  Pure, localStorage-backed unlock/best-score tracking for the jewel levels.
+  blocks-progress.ts  Pure, localStorage-backed best-score tracking for the jewel levels.
   audio.ts            WebAudio synthesized sound effects (no audio files). Mute persists.
   storage.ts          Guarded localStorage wrappers (loadJSON / saveJSON).
   main.ts             Wires DOM: landing page, gem level-select, game screen (endless + level mode), HUD,
@@ -183,10 +183,9 @@ Logic lives in `specials.ts` (`planSpecials`, `expandActivation`, `comboActivati
 
 ## Milestone 5: shipping on the Fire tablet (as built)
 
-- Level-select home screen (`main.ts` + `#screen-levels`): 100-level scrollable grid, locked/unlocked,
-  0-3 stars. `levels-progress.ts` is the pure localStorage-backed progress module -- level N unlocks once
-  N-1 has a win recorded; stars are based on moves spent vs. the level's budget (<=50% of limit = 3 stars,
-  <=75% = 2, else 1).
+- Level-select home screen (`main.ts` + `#screen-levels`): 100-level scrollable grid, every level always
+  selectable, 0-3 stars. `levels-progress.ts` is the pure localStorage-backed progress module; stars are
+  based on moves spent vs. the level's budget (<=50% of limit = 3 stars, <=75% = 2, else 1).
   - Game screen is shared between level mode and the original endless mode; the right-hand pill shows
     Best (endless) or Moves (level), and an objectives bar above the board shows live per-objective progress
     only in level mode.
@@ -229,7 +228,7 @@ tray onto an 8x8 grid; full rows/columns clear. No rotation. Game over when no t
 Landing page -> Blocks card opens a menu (`#screen-blocks-menu`: Home / Endless buttons + a 65-level grid). A level starts
 from a pre-filled pattern with some **jewel crates** (tan block, cyan diamond) already in it; tray pieces
 sometimes carry jewels too. **Clearing a row or column that contains a jewel collects it**; collect the goal
-count to win. You lose when no tray piece fits. Level N unlocks when N-1 is won.
+count to win. You lose when no tray piece fits. Every level is always selectable from the grid.
 
 - **Cells and pieces:** `BlockGrid` cells are `{color, jewel}`; a `Piece` has `jewels: number[]` (indices into
   `shape.cells`). `applyMove` reports `jewels` collected; the intersection of a cleared row and column counts once.

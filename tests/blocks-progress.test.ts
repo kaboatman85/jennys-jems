@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isBlockLevelUnlocked, isBlockLevelWon, loadBlockProgress, recordBlockWin } from '../src/blocks-progress.ts';
+import { isBlockLevelWon, loadBlockProgress, recordBlockWin } from '../src/blocks-progress.ts';
 
 // Progress round-trips through localStorage (via storage.ts); Node has none, so stub one.
 const memory = new Map<string, string>();
@@ -15,14 +15,11 @@ const memory = new Map<string, string>();
   },
 } as Storage;
 
-test('level 1 is always unlocked; level N needs N-1 won', () => {
+test('isBlockLevelWon reflects recorded wins only', () => {
   memory.clear();
   const p = loadBlockProgress();
-  assert.equal(isBlockLevelUnlocked(p, 1), true);
-  assert.equal(isBlockLevelUnlocked(p, 2), false);
+  assert.equal(isBlockLevelWon(p, 1), false);
   const after = recordBlockWin(1, 120);
-  assert.equal(isBlockLevelUnlocked(after, 2), true);
-  assert.equal(isBlockLevelUnlocked(after, 3), false);
   assert.equal(isBlockLevelWon(after, 1), true);
   assert.equal(isBlockLevelWon(after, 2), false);
 });

@@ -14,11 +14,6 @@ export function loadProgress(): LevelProgress {
   return loadJSON<LevelProgress>(KEY, {});
 }
 
-/** Level 1 is always open; any other level unlocks once the one before it has a record. */
-export function isUnlocked(progress: LevelProgress, levelId: number): boolean {
-  return levelId === 1 || progress[levelId - 1] !== undefined;
-}
-
 /** Fewer moves spent relative to the level's budget earns more stars. */
 export function starsFor(movesUsed: number, moveLimit: number): number {
   const frac = moveLimit > 0 ? movesUsed / moveLimit : 1;

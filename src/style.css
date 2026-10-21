@@ -503,18 +503,6 @@ footer {
   color: var(--gold);
 }
 
-.level-btn.locked {
-  background: rgba(200, 180, 190, 0.55);
-  border-color: #b8a0ac;
-  color: #8a7580;
-  cursor: default;
-  box-shadow: none;
-}
-
-.level-btn.locked:active {
-  transform: none;
-}
-
 /* Objectives bar (level mode only) */
 #objectives-bar {
   position: absolute;

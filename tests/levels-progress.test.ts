@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isUnlocked, recordWin, starsFor } from '../src/levels-progress.ts';
-import type { LevelProgress } from '../src/levels-progress.ts';
+import { recordWin, starsFor } from '../src/levels-progress.ts';
 
 // recordWin round-trips through localStorage (via storage.ts); Node has no
 // localStorage global, so stub a minimal in-memory one just for this file.
@@ -16,16 +15,6 @@ const memory = new Map<string, string>();
     return memory.size;
   },
 } as Storage;
-
-test('isUnlocked: level 1 is always open', () => {
-  assert.equal(isUnlocked({}, 1), true);
-});
-
-test('isUnlocked: a later level needs the one before it recorded', () => {
-  const progress: LevelProgress = { 1: { stars: 2, bestScore: 500 } };
-  assert.equal(isUnlocked(progress, 2), true);
-  assert.equal(isUnlocked(progress, 3), false);
-});
 
 test('starsFor: fewer moves spent earns more stars', () => {
   assert.equal(starsFor(10, 20), 3); // 50% or less
